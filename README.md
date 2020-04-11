@@ -1,13 +1,13 @@
 # Succinct-Task1
  
-Task1:
+splitter:
 
     - Usage: 
 
-        make Task1
-        ../build/Task1 file col_num
+        make splitter
+        ../build/splitter file col_num
 
-    - Task1 will save the column in 'file' specified by 'col_num' in "../data/col_[col_num].txt"
+    - splitter will save the column in 'file' specified by 'col_num' in "../data/col_[col_num].txt"
 
 split.sh:
 
