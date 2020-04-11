@@ -5,7 +5,6 @@
 
 #include <iostream>
 #include <stdio.h>
-#include <vector>
 #include <fstream>
 
 //#define LIMIT_LINES
