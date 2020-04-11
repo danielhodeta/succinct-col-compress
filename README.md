@@ -1,13 +1,13 @@
 # Succinct-Task1
  
-split:
+Task1:
 
     - Usage: 
 
-        make split
-        ../build/split file col_num
+        make Task1
+        ../build/Task1 file col_num
 
-    - split will save the column in 'file' specified by 'col_num' in "../data/col_[col_num].txt"
+    - Task1 will save the column in 'file' specified by 'col_num' in "../data/col_[col_num].txt"
 
 split.sh:
 
@@ -15,7 +15,7 @@ split.sh:
 
         ../src/split.sh file col_num
 
-    - Runs split on sample.txt 12 times to split into 12 columns
+    - Runs Task1 on sample.txt 12 times to split into 12 columns
 
     NOTE: split.sh assumes that succinct has been built in a folder called "succinct-cpp" in this
     project's parent directory
