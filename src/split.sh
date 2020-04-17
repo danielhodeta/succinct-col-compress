@@ -1,6 +1,6 @@
 #!/bin/bash
 make clean
-../build/splitter sample.txt 0
+
 ../build/splitter sample.txt 1
 ../build/splitter sample.txt 2
 ../build/splitter sample.txt 3
@@ -12,3 +12,4 @@ make clean
 ../build/splitter sample.txt 9
 ../build/splitter sample.txt 10
 ../build/splitter sample.txt 11
+../build/splitter sample.txt 12
