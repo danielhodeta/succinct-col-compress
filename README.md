@@ -1,4 +1,4 @@
-# Succinct-Task1
+# succinct-col-compress
  
 splitter:
 
