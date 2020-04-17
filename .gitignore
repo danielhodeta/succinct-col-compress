@@ -4,4 +4,7 @@ data/*
 #Build
 build/*
 
+#Vscode
+.vscode/*
+
 *.o

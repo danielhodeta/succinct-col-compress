@@ -1,5 +1,5 @@
 #!/bin/bash
-DIR=../../succinct-cpp/build/examples/bin
+DIR=../
 DATA=../data
 
 $DIR/compress $DATA/col_1.txt

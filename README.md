@@ -17,8 +17,7 @@ split.sh:
 
     - Runs Task1 on sample.txt 12 times to split into 12 columns
 
-    NOTE: split.sh assumes that succinct has been built in a folder called "succinct-cpp" in this
-    project's parent directory
+    NOTE: split.sh assumes that the compress executable exists in the parent directory
 
 compress.sh:
 
