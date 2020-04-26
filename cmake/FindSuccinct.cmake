@@ -18,5 +18,5 @@ find_library(SUCCINCT_LIBRARY
         PATH_SUFFIXES
         lib)
 
-message(STATUS ${SUCCINCT_INCLUDE_DIR})
-message(STATUS ${SUCCINCT_LIBRARY})
+message(STATUS "INCLUDE directory: ${SUCCINCT_INCLUDE_DIR}")
+message(STATUS "Succinct library: ${SUCCINCT_LIBRARY}")

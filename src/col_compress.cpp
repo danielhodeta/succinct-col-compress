@@ -8,13 +8,11 @@
 #include <fstream>
 #include "succinct_file.h"
 
-int splitToCol(char *read_file, int col_num, bool limit_flag = 0) {
+int splitToCol(char *read_file, int col_num, std::string out_name, bool limit_flag = 0) {
 
     FILE *fptr = fopen(read_file, "r");
     
     std::ofstream file_out;
-    std::string read_f {read_file};                                      //Converted to C++ String to allow concatenation
-    std::string out_name = "./data/"+read_f+"_col_"+std::to_string(col_num+1)+".txt";
     file_out.open(out_name, std::ofstream::app);
 
     int line_count = 0;
@@ -49,6 +47,14 @@ int splitToCol(char *read_file, int col_num, bool limit_flag = 0) {
 
 } 
 
+int compressCol(std::string file_name) {
+    auto *fd = new SuccinctFile(file_name);
+
+    fd->Serialize(file_name + ".succinct");
+
+    return 1;
+}
+
 int main(int argc, char **argv) {
 
     if (argc<=2) {
@@ -65,7 +71,22 @@ int main(int argc, char **argv) {
         exit(1);
     }
     
-    if(splitToCol(read_file, col_num-1)) std::cout<<"Success!\n";       //Split file
+    std::string read_f {read_file};                                      //Converted to C++ String to allow concatenation
+    std::string out_name = "../data/"+read_f+"_col_"+std::to_string(col_num+1)+".txt";
+
+    if(splitToCol(read_file, col_num-1, out_name)) {
+        std::cout<<"Splitting Successful!\n";       //Split file
+    } else {
+        std::cerr<<"Splitting failure";
+        exit(1);
+    }
+
+    if(compressCol(out_name)) {
+        std::cout<<"Compression Successful!\n";
+    } else {
+        std::cerr<<"Compression failure";
+        exit(1);
+    }
 
     return 0;
 }

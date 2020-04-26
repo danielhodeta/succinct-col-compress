@@ -16,4 +16,5 @@ include(SuccinctExternal)
 include(FindSuccinct)
 
 #add subdirectories
+
 add_subdirectory(src)
