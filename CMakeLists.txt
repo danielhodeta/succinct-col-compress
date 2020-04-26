@@ -1,0 +1,19 @@
+cmake_minimum_required(VERSION 3.10)
+
+# set the project name
+project(succinct-col-compress   VERSION 2.0
+                                DESCRIPTION "Splits a file into columns and uses succinct to compress each column"
+                                LANGUAGES CXX)
+
+#set executable location
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+
+#add module
+set (CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
+
+#execute modules
+include(SuccinctExternal)
+include(FindSuccinct)
+
+#add subdirectories
+add_subdirectory(src)

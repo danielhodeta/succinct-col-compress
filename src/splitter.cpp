@@ -6,6 +6,7 @@
 #include <iostream>
 #include <stdio.h>
 #include <fstream>
+#include "succinct_file.h"
 
 int splitToCol(char *read_file, int col_num, bool limit_flag = 0) {
 
