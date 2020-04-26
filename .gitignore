@@ -7,4 +7,17 @@ build/*
 #Vscode
 .vscode/*
 
+#CMake
+CMakeFiles/*
+CMakeCache.txt
+Makefile
+cmake_install.cmake
+src/CMakeFiles/*
+src.cmake_install.cmake
+Makefile
+
+#external
+external/*
+
+
 *.o
