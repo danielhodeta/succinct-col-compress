@@ -14,3 +14,4 @@ rm -f -r build/
 
 rm -f -r bin/
 
+rm -f -r out/

@@ -76,9 +76,9 @@ int main(int argc, char **argv) {
 
     size_t index {f_path.find_last_of("/", f_path.length())};
     if (index == -1){
-        out_name = "../data/"+f_path+"_col_"+std::to_string(col_num)+".txt";
+        out_name = "./out/"+f_path+"_col_"+std::to_string(col_num)+".txt";
     } else {
-        out_name = "../data/"+f_path.substr(index+1, f_path.length())+"_col_"+std::to_string(col_num)+".txt";
+        out_name = "./out/"+f_path.substr(index+1, f_path.length())+"_col_"+std::to_string(col_num)+".txt";
     }
 
     std::cout<<out_name<<'\n';
