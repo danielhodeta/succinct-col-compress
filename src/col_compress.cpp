@@ -8,14 +8,13 @@
 #include <fstream>
 #include "succinct_file.h"
 
-int splitToCol(char *read_file, int col_num, bool limit_flag = 0) {
+int splitToCol(char *file_path, int col_num, std::string out_name, bool limit_flag = 0) {
 
-    FILE *fptr = fopen(read_file, "r");
+    FILE *fptr = fopen(file_path, "r");
     
     std::ofstream file_out;
-    std::string read_f {read_file};                                      //Converted to C++ String to allow concatenation
-    std::string out_name = "./data/"+read_f+"_col_"+std::to_string(col_num+1)+".txt";
-    file_out.open(out_name, std::ofstream::app);
+    file_out.open(out_name, std::ofstream::trunc);
+
 
     int line_count = 0;
     char *buffer = nullptr;
@@ -49,6 +48,14 @@ int splitToCol(char *read_file, int col_num, bool limit_flag = 0) {
 
 } 
 
+int compressCol(std::string file_name) {
+    auto *fd = new SuccinctFile(file_name);
+
+    fd->Serialize(file_name + ".succinct");
+
+    return 1;
+}
+
 int main(int argc, char **argv) {
 
     if (argc<=2) {
@@ -56,7 +63,7 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    char *read_file {argv[1]};
+    char *file_path {argv[1]};
     int col_num = atoi(argv[2]);                                          //Indicate which column you would like to save
                                                                           //Implemented because splitting all at once takes too much time
 
@@ -65,7 +72,29 @@ int main(int argc, char **argv) {
         exit(1);
     }
     
-    if(splitToCol(read_file, col_num-1)) std::cout<<"Success!\n";       //Split file
+    std::string f_path {file_path};                                      //Converted to C++ String to allow concatenation
+    std::string out_name;
+
+    size_t index {f_path.find_last_of("/", f_path.length())};
+    if (index == -1){
+        out_name = "./out/"+f_path+"_col_"+std::to_string(col_num)+".txt";
+    } else {
+        out_name = "./out/"+f_path.substr(index+1, f_path.length())+"_col_"+std::to_string(col_num)+".txt";
+    }
+
+    if(splitToCol(file_path, col_num-1, out_name)) {
+        std::cout<<"Splitting Successful!\n";       //Split file
+    } else {
+        std::cerr<<"Splitting failure\n";
+        exit(1);
+    }
+
+    if(compressCol(out_name)) {
+        std::cout<<"Compression Successful!\n\n";
+    } else {
+        std::cerr<<"Compression failure\n";
+        exit(1);
+    }
 
     return 0;
 }

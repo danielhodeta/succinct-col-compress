@@ -4,6 +4,12 @@ data/*
 #Build
 build/*
 
+#Bin
+bin/*
+
+#Out
+out/*
+
 #Vscode
 .vscode/*
 
