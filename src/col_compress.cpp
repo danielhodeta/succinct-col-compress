@@ -8,9 +8,19 @@
 #include <fstream>
 #include "succinct_file.h"
 
-int splitToCol(char *file_path, int col_num, std::string out_name, bool limit_flag = 0) {
+void displayError(std::string msg) {
+    std::cout<<"col_compress: "<<msg<<'\n';
+    exit(1);
+}
 
+int splitToCol(char *file_path, int col_num, std::string out_name, bool limit_flag = 0) {
+    
     FILE *fptr = fopen(file_path, "r");
+    
+    if (!fptr) {
+        std::cerr<<"splitToCol: invalid file!\n";
+        return 0;
+    }
     
     std::ofstream file_out;
     file_out.open(out_name, std::ofstream::trunc);
@@ -58,43 +68,34 @@ int compressCol(std::string file_name) {
 
 int main(int argc, char **argv) {
 
-    if (argc<=2) {
-        std::cerr << "no file or column number\n";                       //Minimal error checking but alright for our purposes
-        exit(1);
-    }
+    if (argc<=2) displayError("no file or column number");                  //Minimal error checking but alright for our purposes
 
     char *file_path {argv[1]};
-    int col_num = atoi(argv[2]);                                          //Indicate which column you would like to save
-                                                                          //Implemented because splitting all at once takes too much time
-
-    if (col_num<1) {
-        std::cerr << "column number must be at least 1\n";
-        exit(1);
-    }
     
-    std::string f_path {file_path};                                      //Converted to C++ String to allow concatenation
+    int col_num = atoi(argv[2]);                                            //Indicate which column you would like to save
+
+    if (col_num<1) displayError("column number must be at least 1");
+    
+    std::string f_path {file_path};                                         //Converted to C++ String to allow concatenation
     std::string out_name;
 
     size_t index {f_path.find_last_of("/", f_path.length())};
-    if (index == -1){
+    if (index == -1)
         out_name = "./out/"+f_path+"_col_"+std::to_string(col_num)+".txt";
-    } else {
+    else
         out_name = "./out/"+f_path.substr(index+1, f_path.length())+"_col_"+std::to_string(col_num)+".txt";
-    }
 
-    if(splitToCol(file_path, col_num-1, out_name)) {
-        std::cout<<"Splitting Successful!\n";       //Split file
-    } else {
-        std::cerr<<"Splitting failure\n";
-        exit(1);
-    }
+    
+    if (splitToCol(file_path, col_num-1, out_name))         //Split file
+        std::cout<<"splitting successful!\n";       
+    else
+        displayError("splitting failure!");
 
-    if(compressCol(out_name)) {
-        std::cout<<"Compression Successful!\n\n";
-    } else {
-        std::cerr<<"Compression failure\n";
-        exit(1);
-    }
+    
+    if (compressCol(out_name))                              //Compress file
+        std::cout<<"compression successful!\n"; 
+    else
+        displayError("compression failure!");
 
     return 0;
 }
