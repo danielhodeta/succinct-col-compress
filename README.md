@@ -1,32 +1,18 @@
 # succinct-col-compress
  
-splitter:
+This program splits a given file into columns and compresses each column.
 
-    - Usage: 
+**Usage**
 
-        make splitter
-        ../build/splitter file col_num
+    `./build.sh`                            : to build project
+    `./col_compress.sh FILE_PATH [COL_NUM]` : to start compressing `FILE`
 
-    - splitter will save the column in 'file' specified by 'col_num' in "../data/col_[col_num].txt"
+    `./cleanup.sh`                          : to remove all CMake, build and output files
+    `./ext_cleanup.sh`                      : to remove all external dependencies in addition to the files above
+ 
 
-split.sh:
+If `COL_NUM` is not specified, `col_compress` will compress all columns in file
 
-    - Usage: 
+The `col_compress` executable is built in `./bin/`
 
-        ../src/split.sh file col_num
-
-    - Runs Task1 on sample.txt 12 times to split into 12 columns
-
-    NOTE: split.sh assumes that the compress executable exists in the parent directory
-
-compress.sh:
-
-    - Usage: 
-    
-        ../src/compress.sh file col_num
-
-    - Runs the succinct compression executable on each of the 12 columns generated from sample.txt
-
-NOTE:   Before Running any of the above, create a directory 'data' and save sample.txt there. 
-        Also, create an empty directory 'build'. Both directories should be on the same level
-        as 'src'.
+The output of `col_compress` is stored in `./out/`

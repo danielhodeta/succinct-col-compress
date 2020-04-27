@@ -13,7 +13,7 @@ set (CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
 #execute modules
 include(SuccinctExternal)
-include(FindSuccinct)
+#include(FindSuccinct)
 
 #add subdirectories
 add_subdirectory(src)
