@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#This script cleans all Cmake related and build related files
+
 rm -f -r CMakeFiles
 rm -f cmake_install.cmake
 rm -f Makefile
