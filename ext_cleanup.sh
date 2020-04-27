@@ -7,3 +7,5 @@
 
 cd external
 rm -f -r *
+
+echo "cleaned external dependencies"
