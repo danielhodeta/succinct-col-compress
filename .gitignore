@@ -4,6 +4,9 @@ data/*
 #Build
 build/*
 
+#Bin
+bin/*
+
 #Vscode
 .vscode/*
 

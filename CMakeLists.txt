@@ -6,7 +6,7 @@ project(succinct-col-compress   VERSION 2.0
                                 LANGUAGES CXX)
 
 #set executable location
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
 
 #add module
 set (CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
@@ -16,5 +16,4 @@ include(SuccinctExternal)
 include(FindSuccinct)
 
 #add subdirectories
-
 add_subdirectory(src)

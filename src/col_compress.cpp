@@ -8,9 +8,9 @@
 #include <fstream>
 #include "succinct_file.h"
 
-int splitToCol(char *read_file, int col_num, std::string out_name, bool limit_flag = 0) {
+int splitToCol(char *file_path, int col_num, std::string out_name, bool limit_flag = 0) {
 
-    FILE *fptr = fopen(read_file, "r");
+    FILE *fptr = fopen(file_path, "r");
     
     std::ofstream file_out;
     file_out.open(out_name, std::ofstream::app);
@@ -62,7 +62,7 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    char *read_file {argv[1]};
+    char *file_path {argv[1]};
     int col_num = atoi(argv[2]);                                          //Indicate which column you would like to save
                                                                           //Implemented because splitting all at once takes too much time
 
@@ -71,10 +71,19 @@ int main(int argc, char **argv) {
         exit(1);
     }
     
-    std::string read_f {read_file};                                      //Converted to C++ String to allow concatenation
-    std::string out_name = "../data/"+read_f+"_col_"+std::to_string(col_num+1)+".txt";
+    std::string f_path {file_path};                                      //Converted to C++ String to allow concatenation
+    std::string out_name;
 
-    if(splitToCol(read_file, col_num-1, out_name)) {
+    size_t index {f_path.find_last_of("/", f_path.length())};
+    if (index == -1){
+        out_name = "../data/"+f_path+"_col_"+std::to_string(col_num)+".txt";
+    } else {
+        out_name = "../data/"+f_path.substr(index+1, f_path.length())+"_col_"+std::to_string(col_num)+".txt";
+    }
+
+    std::cout<<out_name<<'\n';
+
+    if(splitToCol(file_path, col_num-1, out_name)) {
         std::cout<<"Splitting Successful!\n";       //Split file
     } else {
         std::cerr<<"Splitting failure";

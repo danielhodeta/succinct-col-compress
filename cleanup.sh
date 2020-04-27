@@ -10,4 +10,7 @@ rm -f src/Makefile
 
 rm -f CMakeCache.txt
 
-rm -f -r build
+rm -f -r build/
+
+rm -f -r bin/
+

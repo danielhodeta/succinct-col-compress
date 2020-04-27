@@ -6,6 +6,5 @@ include_directories("${SUCCINCT_INCLUDE_DIR}")
 #create executable
 add_executable(col_compress col_compress.cpp)
 
-
 #Link libraries
-target_link_libraries(col_compress "${SUCCINCT_LIBRARY}")
+target_link_libraries(col_compress "${SUCCINCT_LIBRARY}" pthread)
