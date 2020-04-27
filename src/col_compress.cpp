@@ -13,7 +13,8 @@ int splitToCol(char *file_path, int col_num, std::string out_name, bool limit_fl
     FILE *fptr = fopen(file_path, "r");
     
     std::ofstream file_out;
-    file_out.open(out_name, std::ofstream::app);
+    file_out.open(out_name, std::ofstream::trunc);
+
 
     int line_count = 0;
     char *buffer = nullptr;
@@ -81,19 +82,17 @@ int main(int argc, char **argv) {
         out_name = "./out/"+f_path.substr(index+1, f_path.length())+"_col_"+std::to_string(col_num)+".txt";
     }
 
-    std::cout<<out_name<<'\n';
-
     if(splitToCol(file_path, col_num-1, out_name)) {
         std::cout<<"Splitting Successful!\n";       //Split file
     } else {
-        std::cerr<<"Splitting failure";
+        std::cerr<<"Splitting failure\n";
         exit(1);
     }
 
     if(compressCol(out_name)) {
-        std::cout<<"Compression Successful!\n";
+        std::cout<<"Compression Successful!\n\n";
     } else {
-        std::cerr<<"Compression failure";
+        std::cerr<<"Compression failure\n";
         exit(1);
     }
 
