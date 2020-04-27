@@ -6,14 +6,19 @@
 
 include(ExternalProject)
 
+#Succinct Directories
 set(SUCCINCT_PREFIX "${PROJECT_SOURCE_DIR}/external/succinct-cpp-prefix")
 set(SUCCINCT_HOME "${SUCCINCT_PREFIX}")
+set(EXTERNAL_SOURCE_DIR "${SUCCINCT_PREFIX}/succinct-cpp")
+set(EXTERNAL_BIN_DIR "${SUCCINCT_PREFIX}/build")
 
+#Succinct Library Name
 set(SUCCINCT_STATIC_LIB_NAME "${CMAKE_STATIC_LIBRARY_PREFIX}succinct")
 set(SUCCINCT_FULL_LIBRARY_NAME "${SUCCINCT_STATIC_LIB_NAME}${CMAKE_STATIC_LIBRARY_SUFFIX}")
 
-set(EXTERNAL_SOURCE_DIR "${SUCCINCT_PREFIX}/succinct-cpp")
-set(EXTERNAL_BIN_DIR "${SUCCINCT_PREFIX}/build")
+#Set Temporary Include Directory and Library
+set(SUCCINCT_INCLUDE_DIR "${EXTERNAL_SOURCE_DIR}/core/include")
+set(SUCCINCT_LIBRARY "${EXTERNAL_BIN_DIR}/core/lib/${SUCCINCT_FULL_LIBRARY_NAME}")
 
 ExternalProject_Add(succinct-cpp
         GIT_REPOSITORY "https://github.com/amplab/succinct-cpp.git"
