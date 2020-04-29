@@ -13,6 +13,7 @@ set (CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
 #execute modules
 include(LZ4External)
+include(DSLibExternal)
 include(SuccinctExternal)
 #include(FindSuccinct)
 
