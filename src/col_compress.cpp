@@ -8,7 +8,7 @@
 #include <fstream>
 #include <functional>
 #include "succinct_compress.h"
-#include "LZ4Compress.h"
+#include "lz4_compress.h"
 
 void display_error(std::string msg) {
     std::cout<<"col_compress: "<<msg<<'\n';
