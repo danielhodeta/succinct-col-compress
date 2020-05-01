@@ -8,6 +8,7 @@
 #include <fstream>
 #include <functional>
 #include "succinct_compress.h"
+#include "LZ4Compress.h"
 
 void display_error(std::string msg) {
     std::cout<<"col_compress: "<<msg<<'\n';
@@ -65,6 +66,7 @@ std::function<int(std::string)> SelectCompression(std::string data_type) {
 
 }
 
+
 int main(int argc, char **argv) {
 
     if (argc<=2) display_error("no file or column number");                  //Minimal error checking but alright for our purposes
@@ -95,6 +97,7 @@ int main(int argc, char **argv) {
         std::cout<<"compression successful!\n"; 
     else
         display_error("compression failure!");
+
 
     return 0;
 }
