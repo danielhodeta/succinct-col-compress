@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.10)
 
 #include directories
-include_directories("${SUCCINCT_INCLUDE_DIR}" "${LZ4_INCLUDE_DIR}")
+include_directories("${SUCCINCT_INCLUDE_DIR}" "${LZ4_INCLUDE_DIR}" "./include")
 
 #create executable
-add_executable(col_compress col_compress.cpp)
+add_executable(col_compress col_compress.cpp LZ4Compress.cpp)
 add_dependencies(col_compress succinct-cpp)
 
 #Link libraries
