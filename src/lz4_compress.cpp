@@ -70,6 +70,8 @@ int LZ4Compress(std::string file_name) {
     free(inpBuf);
     free(cmpBuf);
     LZ4_freeStream(lz4Stream);
+
+    return 1;
 }
 
 //Source: lz4/examples/blockStreaming_lineByline.c

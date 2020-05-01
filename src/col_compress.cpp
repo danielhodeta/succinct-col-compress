@@ -60,9 +60,15 @@ int SplitToCol(char *file_path, int col_num, std::string out_name, bool limit_fl
 
 } 
 
-std::function<int(std::string)> SelectCompression(std::string data_type) {
-
-    return SuccinctCompress;
+std::function<int(std::string)> SelectCompression(char data_type) {
+    switch (data_type) {
+        case 's':
+            return SuccinctCompress;
+        case 'l':
+            return LZ4Compress;
+        default:
+            return SuccinctCompress;
+    }
 
 }
 
@@ -93,7 +99,7 @@ int main(int argc, char **argv) {
         display_error("splitting failure!");
 
     
-    if ((SelectCompression("string"))(out_name))                              //Compress file
+    if ((SelectCompression('l'))(out_name))                              //Compress file
         std::cout<<"compression successful!\n"; 
     else
         display_error("compression failure!");
