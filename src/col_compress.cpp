@@ -6,7 +6,8 @@
 #include <iostream>
 #include <stdio.h>
 #include <fstream>
-#include "succinct_file.h"
+#include <functional>
+#include "succinct_compress.h"
 
 void display_error(std::string msg) {
     std::cout<<"col_compress: "<<msg<<'\n';
@@ -58,12 +59,10 @@ int SplitToCol(char *file_path, int col_num, std::string out_name, bool limit_fl
 
 } 
 
-int SuccinctCompress(std::string file_name) {
-    auto *fd = new SuccinctFile(file_name);
+std::function<int(std::string)> SelectCompression(std::string data_type) {
 
-    fd->Serialize(file_name + ".succinct");
+    return SuccinctCompress;
 
-    return 1;
 }
 
 int main(int argc, char **argv) {
@@ -92,7 +91,7 @@ int main(int argc, char **argv) {
         display_error("splitting failure!");
 
     
-    if (SuccinctCompress(out_name))                              //Compress file
+    if ((SelectCompression("string"))(out_name))                              //Compress file
         std::cout<<"compression successful!\n"; 
     else
         display_error("compression failure!");
