@@ -8,12 +8,12 @@
 #include <fstream>
 #include "succinct_file.h"
 
-void displayError(std::string msg) {
+void display_error(std::string msg) {
     std::cout<<"col_compress: "<<msg<<'\n';
     exit(1);
 }
 
-int splitToCol(char *file_path, int col_num, std::string out_name, bool limit_flag = 0) {
+int SplitToCol(char *file_path, int col_num, std::string out_name, bool limit_flag = 0) {
     
     FILE *fptr = fopen(file_path, "r");
     
@@ -58,7 +58,7 @@ int splitToCol(char *file_path, int col_num, std::string out_name, bool limit_fl
 
 } 
 
-int compressCol(std::string file_name) {
+int SuccinctCompress(std::string file_name) {
     auto *fd = new SuccinctFile(file_name);
 
     fd->Serialize(file_name + ".succinct");
@@ -68,13 +68,13 @@ int compressCol(std::string file_name) {
 
 int main(int argc, char **argv) {
 
-    if (argc<=2) displayError("no file or column number");                  //Minimal error checking but alright for our purposes
+    if (argc<=2) display_error("no file or column number");                  //Minimal error checking but alright for our purposes
 
     char *file_path {argv[1]};
     
     int col_num = atoi(argv[2]);                                            //Indicate which column you would like to save
 
-    if (col_num<1) displayError("column number must be at least 1");
+    if (col_num<1) display_error("column number must be at least 1");
     
     std::string f_path {file_path};                                         //Converted to C++ String to allow concatenation
     std::string out_name;
@@ -86,16 +86,16 @@ int main(int argc, char **argv) {
         out_name = "./out/"+f_path.substr(index+1, f_path.length())+"_col_"+std::to_string(col_num)+".txt";
 
     
-    if (splitToCol(file_path, col_num-1, out_name))         //Split file
+    if (SplitToCol(file_path, col_num-1, out_name))         //Split file
         std::cout<<"splitting successful!\n";       
     else
-        displayError("splitting failure!");
+        display_error("splitting failure!");
 
     
-    if (compressCol(out_name))                              //Compress file
+    if (SuccinctCompress(out_name))                              //Compress file
         std::cout<<"compression successful!\n"; 
     else
-        displayError("compression failure!");
+        display_error("compression failure!");
 
     return 0;
 }
