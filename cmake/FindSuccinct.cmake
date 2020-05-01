@@ -6,7 +6,7 @@ find_path(SUCCINCT_INCLUDE_DIR
         NAMES
         succinct_file.h
         HINTS
-        ${EXTERNAL_SOURCE_DIR}/core/include
+        ${SUCCINCT_SOURCE_DIR}/core/include
         PATH_SUFFIXES
         include)
 
@@ -14,7 +14,7 @@ find_library(SUCCINCT_LIBRARY
         NAMES
         ${SUCCINCT_FULL_LIBRARY_NAME}
         HINTS
-        ${EXTERNAL_BIN_DIR}/core/
+        ${SUCCINCT_BIN_DIR}/core/
         PATH_SUFFIXES
         lib)
 
