@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <cstring>
 #include "lz4.h"
-#include "LZ4Compress.h"
+#include "lz4_compress.h"
 
 //Source: lz4/examples/blockStreaming_lineByline.c
 static size_t write_uint16(FILE* fp, uint16_t i) {
