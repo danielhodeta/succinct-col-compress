@@ -1,6 +1,6 @@
 # succinct-col-compress
  
-This program splits a given file into columns and compresses each column.
+This program splits a given file into columns and compresses each column. It assumes that the file is metadata of 12 columns.
 
 **Usage**
 
@@ -10,6 +10,11 @@ This program splits a given file into columns and compresses each column.
     `./cleanup.sh`                          : to remove all CMake, build and output files
     `./ext_cleanup.sh`                      : to remove all external dependencies in addition to the files above
  
+**Compression Schemes**
+
+- Succinct (Column: TBD)
+- LZ4 (Column: TBD)
+- Delta-Encoded Array (Column: TBD)
 
 If `COL_NUM` is not specified, `col_compress` will compress all columns in file
 
