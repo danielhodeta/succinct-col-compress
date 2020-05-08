@@ -5,8 +5,6 @@
 #Usage:
 #   ./col_compress.sh FILE_NAME [COLUMN_NUMBER]
 
-echo "========================================="
-
 
 if [ $# -eq 0 ];                                        #Check file is given
 then
@@ -18,10 +16,6 @@ then
     for (( i=1; i<=$col_num; i++ ))
     do 
         ./bin/col_compress $@ $i
-        if [ $? -eq 0 ];                                #Check compression was successful
-        then
-            echo "==Compressed column $i=="$'\n'
-        fi
     done 
 
 else
@@ -30,12 +24,6 @@ else
         echo "column number must be at least 1"
     else
         ./bin/col_compress $@
-        if [ $? -eq 0 ];                                #Check compression was successful
-        then
-            echo "==Compressed column $2=="$'\n'
-        fi
     fi
     
 fi
-
-echo "========================================="
