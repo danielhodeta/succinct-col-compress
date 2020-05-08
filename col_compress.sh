@@ -3,27 +3,53 @@
 #This script compresses the specified column (or all if none given, all columns) of the file given.
 
 #Usage:
-#   ./col_compress.sh FILE_NAME [COLUMN_NUMBER]
+#   ./col_compress.sh FILE_NAME [-c COLUMN_NUMBER] [COMPRESSION SCHEME]*
 
 
-if [ $# -eq 0 ];                                        #Check file is given
+if [ $# -eq 0 ];                                           #Check file is given
 then
     echo "no file given"
 
-elif [ $# -eq 1 ]; 
+elif [ $# -eq 1 ];                                         #Only file name given
 then 
-    col_num=$(head -n 1 $1 | wc -w)                     #Count columns
+    col_num=$(head -n 1 $1 | wc -w)                     
     for (( i=1; i<=$col_num; i++ ))
     do 
-        ./bin/col_compress $@ $i
-    done 
+        ./bin/col_compress $@ $i "succinct" "lz4"
+        echo
+    done  
 
 else
-    if [ $2 -lt 1 ];                                    #Check col_num > 0
-    then 
-        echo "column number must be at least 1"
-    else
-        ./bin/col_compress $@
+    if [ $# -gt 3 ] && [ $2 = '-c' ];                      #File name and column number given              
+    then
+        if [ $3 -le 0 ];                                   #Check col_num > 0
+        then 
+            echo "column number must be at least 1"
+        else
+            ./bin/col_compress $1 $3 ${@:4}
+            echo
+        fi
+
+    elif [ $# -lt 3 ] && [ $2 = '-c' ];                     #Column number flag without actual number ->error
+    then
+        echo "column number not specified"
+
+    elif [ $# -eq 3 ] && [ $2 = '-c' ];                     #Column number flag without actual number ->error
+    then
+        if [ $3 -le 0 ];                                    #Check col_num > 0
+        then 
+            echo "column number must be at least 1"
+        else
+            ./bin/col_compress $1 $3 "succinct" "lz4"
+            echo
+        fi
+    else                                                    #File name and column number given
+        col_num=$(head -n 1 $1 | wc -w)                     
+        for (( i=1; i<=$col_num; i++ ))
+        do 
+            ./bin/col_compress $1 $i ${@:2}
+            echo
+        done 
     fi
     
 fi

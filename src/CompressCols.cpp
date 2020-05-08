@@ -5,10 +5,78 @@
 #include "CompressCols.h"
 
 
-/*
- * Private Member Functions ==>
- */
+//Class Contructor
+CompressCols::CompressCols(std::string file_path, int col_num, bool limit_flag) {
+    
+    this->ifile_path = file_path;
+    this->col_num = col_num;
 
+    size_t index {file_path.find_last_of("/", file_path.length())};
+    if (index == -1)
+        this->ofile_path = "./out/"+file_path+"_col_"+std::to_string(col_num)+".txt";
+    else
+        this->ofile_path = "./out/"+file_path.substr(index+1, file_path.length())+"_col_"+std::to_string(col_num)+".txt"; 
+
+    
+    this->split = false;
+    this->limit_flag = limit_flag;
+    this->compressed = false;
+    
+}
+
+//Compression function
+int CompressCols::Compress(std::string scheme) {
+    if (!this->split) this->Split();
+
+    this->scheme = scheme;
+
+    int return_val = 0;
+
+    switch (this->scheme.c_str()[0]) {
+        case 's':
+            if (this->scheme!="succinct") break;
+            return_val = this->SuccinctCompress();
+            this->compressed = true;
+            break;
+        case 'l':
+            if (this->scheme!="lz4") break;
+            return_val = this->LZ4Compress();
+            this->compressed = true;
+            break;
+        default:
+            break;
+    }
+    return return_val;
+}
+
+//Decompression function (using original compression scheme)
+int CompressCols::Decompress() {
+
+    int return_val (0);
+
+    if (!this->compressed) {
+        std::cerr<<"File hasn't been compressed yet!\n";
+        return return_val;
+    }
+
+    switch (this->scheme.c_str()[0]) {
+        case 's':
+            //return_val = this->SuccinctDecompress();
+            break;
+        case 'l':
+            this->LZ4Decompress();
+            return_val = 1;
+            break;
+        default:
+            //return_val = this->SuccinctCompress();
+            break;
+    }
+
+    return return_val;
+
+}
+
+//File splitting function
 int CompressCols::Split() {
 
     std::string ifp = this->ifile_path;
@@ -31,7 +99,7 @@ int CompressCols::Split() {
 
     while (getline(&buffer, &n, fptr) != -1) {                          //Populating data table
 
-        if (this->limit_flag && line_count>6) break;                          //If limit_flag is set to 1, only six lines will be written to file
+        if (this->limit_flag && line_count>6) break;                    //If limit_flag is set to 1, only six lines will be written to file
 
         std::string line_read {buffer};                                 //Converting from C string to C++ string for more freedom
         line_read = line_read.substr(0, line_read.find('\n'))+" \n";    //Space added before trailing '\n'
@@ -59,9 +127,13 @@ int CompressCols::Split() {
 }
 
 
-/*
-* Succinct Compression
-*/
+/* ========================
+ *   Compression Schemes
+ * ========================
+ */
+
+
+/* Succinct */
 
 int CompressCols::SuccinctCompress() {
     std::string ofp = this->ofile_path;
@@ -73,9 +145,9 @@ int CompressCols::SuccinctCompress() {
 }
 
 /*
-* LZ4 Compression and Decompression
+* LZ4
 * 
-* Source: lz4/examples/blockStreaming_lineByline.c
+* Code Source: lz4/examples/blockStreaming_lineByline.c
 */ 
 
 static size_t write_uint16(FILE* fp, uint16_t i) {
@@ -97,6 +169,7 @@ static size_t read_bin(FILE* fp, void* array, int arrayBytes)
     return fread(array, 1, arrayBytes, fp);
 }
 
+//LZ4 Compression function
 int CompressCols::LZ4Compress() {
     std::string ofp = this->ofile_path;
 
@@ -147,6 +220,7 @@ int CompressCols::LZ4Compress() {
     return 1;
 }
 
+//LZ4 Decompression function
 void CompressCols::LZ4Decompress() {
     std::string ofp = this->ofile_path;
     
@@ -190,79 +264,3 @@ void CompressCols::LZ4Decompress() {
     free(cmpBuf);
     LZ4_freeStreamDecode(lz4StreamDecode);
 }
-
-// <==
-
-/*
- * Public Member Functions ==>
- */
-
-CompressCols::CompressCols(std::string file_path, int col_num, bool limit_flag) {
-    
-    this->ifile_path = file_path;
-    this->col_num = col_num;
-
-    size_t index {file_path.find_last_of("/", file_path.length())};
-    if (index == -1)
-        this->ofile_path = "./out/"+file_path+"_col_"+std::to_string(col_num)+".txt";
-    else
-        this->ofile_path = "./out/"+file_path.substr(index+1, file_path.length())+"_col_"+std::to_string(col_num)+".txt"; 
-
-    
-    this->split = false;
-    this->limit_flag = limit_flag;
-    this->compressed = false;
-    
-}
-
-int CompressCols::Compress(std::string scheme) {
-    if (!this->split) this->Split();
-
-    this->scheme = scheme;
-
-    int return_val = 0;
-
-    switch (this->scheme.c_str()[0]) {
-        case 's':
-            return_val = this->SuccinctCompress();
-            break;
-        case 'l':
-            return_val = this->LZ4Compress();
-            break;
-        default:
-            return_val = this->SuccinctCompress();
-            break;
-    }
-    this->compressed = true;
-    return return_val;
-}
-
-//Add a decompression method
-
-int CompressCols::Decompress() {
-    if (!this->compressed) {
-        std::cerr<<"File hasn't been compressed yet!\n";
-        exit(1);
-    }
-
-    int return_val (0);
-
-    switch (this->scheme.c_str()[0]) {
-        case 's':
-            //return_val = this->SuccinctDecompress();
-            break;
-        case 'l':
-            this->LZ4Decompress();
-            return_val = 1;
-            break;
-        default:
-            //return_val = this->SuccinctCompress();
-            break;
-    }
-
-    return return_val;
-
-}
-
-
-// <==

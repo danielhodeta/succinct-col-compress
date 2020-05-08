@@ -25,18 +25,27 @@ int main(int argc, char **argv) {
     int col_num = atoi(argv[2]);                                            //Indicate which column you would like to save
     if (col_num<1) display_error("column number must be at least 1");
     
-    std::string scheme = "lz4";
     auto *cfile = new CompressCols(f_path, col_num);
 
-    if(cfile->Compress(scheme))
-        std::cout<<"Compressed column "+std::to_string(col_num)+" using "+scheme+".\n";
-    else
-        std::cout<<"Compression unsuccessful.\n";
+    for (int i=3; i<argc; i++) {
+        std::string scheme = argv[i];
 
-    if(cfile->Decompress())
-        std::cout<<"Decompression successful.\n";
-    else
-        std::cout<<"Decompression unsuccessful.\n";
+        if(cfile->Compress(scheme))
+            std::cout<<"Compressed column "+std::to_string(col_num)+" using "+scheme+".\n";
+        else
+            std::cout<<scheme + " compression unsuccessful for column "+std::to_string(col_num)+".\n";
+
+        // if(cfile->Decompress())
+        //     std::cout<<scheme + " decompression successful for column "+std::to_string(col_num)+".\n";
+        // else
+        //     std::cout<<scheme + " decompression unsuccessful for column "+std::to_string(col_num)+".\n";
+
+    }
+
+    
+    
+
+    
 
     return 0;
 }
