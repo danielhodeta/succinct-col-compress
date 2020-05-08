@@ -115,7 +115,7 @@ int CompressCols::Split() {
 
             std::string cell_data = line_read.substr(0,
                                             line_read.find(' '));       //This is the string we want to store in the table      
-            if(i==this->col_num) {                                            //Write to file
+            if(i==this->col_num-1) {                                            //Write to file
                 file_out << cell_data << '\n';
                 line_count++;              
             }
