@@ -11,6 +11,7 @@ class CompressCols {
     std::string scheme;
 
     int col_num;
+    u_int64_t line_num;
 
     bool split;
     bool compressed;
@@ -20,6 +21,7 @@ class CompressCols {
     int SuccinctCompress();
     int LZ4Compress();
     void LZ4Decompress();
+    template<typename data_type> int DeltaEACompress();
 
   public:
     

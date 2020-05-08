@@ -5,6 +5,7 @@
 #Usage:
 #   ./col_compress.sh FILE_NAME [-c COLUMN_NUMBER] [COMPRESSION SCHEME]*
 
+schemes=("succinct" "lz4" "dea")
 
 if [ $# -eq 0 ];                                           #Check file is given
 then
@@ -15,7 +16,7 @@ then
     col_num=$(head -n 1 $1 | wc -w)                     
     for (( i=1; i<=$col_num; i++ ))
     do 
-        ./bin/col_compress $@ $i "succinct" "lz4"
+        ./bin/col_compress $@ $i ${schemes[@]}
         echo
     done  
 
@@ -40,7 +41,7 @@ else
         then 
             echo "column number must be at least 1"
         else
-            ./bin/col_compress $1 $3 "succinct" "lz4"
+            ./bin/col_compress $1 $3 ${schemes[@]}
             echo
         fi
     else                                                    #File name and column number given

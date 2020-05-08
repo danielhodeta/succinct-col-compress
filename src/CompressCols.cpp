@@ -1,8 +1,10 @@
 #include <stdio.h>
 #include <cstring>
+#include <sstream>
 #include "succinct_file.h"
 #include "lz4.h"
 #include "CompressCols.h"
+#include "delta_encoded_array.h"
 
 
 //Class Contructor
@@ -10,6 +12,7 @@ CompressCols::CompressCols(std::string file_path, int col_num, bool limit_flag) 
     
     this->ifile_path = file_path;
     this->col_num = col_num;
+    this->line_num = 0;
 
     size_t index {file_path.find_last_of("/", file_path.length())};
     if (index == -1)
@@ -41,6 +44,11 @@ int CompressCols::Compress(std::string scheme) {
         case 'l':
             if (this->scheme!="lz4") break;
             return_val = this->LZ4Compress();
+            this->compressed = true;
+            break;
+        case 'd':
+            if (this->scheme!="dea") break;
+            return_val = this->DeltaEACompress<u_int64_t>();
             this->compressed = true;
             break;
         default:
@@ -119,6 +127,7 @@ int CompressCols::Split() {
         n = 0;
     }
 
+    this->line_num = line_count;
     file_out.close();
 
     this->split = true;
@@ -263,4 +272,45 @@ void CompressCols::LZ4Decompress() {
     free(decBuf);
     free(cmpBuf);
     LZ4_freeStreamDecode(lz4StreamDecode);
+}
+
+template<typename data_type>
+int CompressCols::DeltaEACompress() {
+    
+    u_int64_t ln = this->line_num;
+    std::string ofp = this->ofile_path;
+
+    std::ifstream file_in (this->ofile_path);                                                //Reading split file
+    std::string read_num;
+    data_type *data_array = new data_type[this->line_num];                                   
+    for (uint64_t i=0; i<line_num && (file_in >> read_num); i++) {                          //Converting strings to data_type and storing in array
+
+        std::istringstream read_stream (read_num);
+        read_stream >> data_array[i];
+
+    }
+
+    bitmap::EliasGammaDeltaEncodedArray<data_type> enc_array(data_array, ln);         //Encoding array
+
+    std::filebuf fb;
+    fb.open(ofp+".delta", std::ios::out);
+    std::ostream file_out (&fb);
+
+    enc_array.Serialize(file_out);                                                      //Serializing array
+    std::cout<<"Before\n";
+    for (uint64_t i=0; i<this->line_num; i++) {                                               //Printing before deserialize
+        std::cout<<enc_array[i]<<"\n";
+    }
+    fb.close();
+
+    std::filebuf fb2;
+    fb2.open(ofp+".delta", std::ios::out);
+    std::istream file_test(&fb2);
+    enc_array.Deserialize(file_test);
+    std::cout<<"After\n";
+    for (uint64_t i=0; i<this->line_num; i++) {                                               //Printing after deserialize
+        std::cout<<enc_array[i]<<"\n";
+    }
+
+    return 1;
 }
