@@ -4,11 +4,11 @@ This program splits a given file into columns and compresses each column. It ass
 
 **Usage**
 
-    `./build.sh`                            : to build project
-    `./col_compress.sh FILE_PATH [COL_NUM]` : to start compressing `FILE`
+    `./build.sh`                                            : to build project
+    `./col_compress.sh FILE_PATH [-c COL_NUM] [SCHEMES]*`   : to start compressing `FILE`
 
-    `./cleanup.sh`                          : to remove all CMake, build and output files
-    `./ext_cleanup.sh`                      : to remove all external dependencies in addition to the files above
+    `./cleanup.sh`                                          : to remove all CMake, build and output files
+    `./ext_cleanup.sh`                                      : to remove all external dependencies in addition to the files above
  
 **Compression Schemes**
 
@@ -17,6 +17,8 @@ This program splits a given file into columns and compresses each column. It ass
 - Delta-Encoded Array (Column: TBD)
 
 If `COL_NUM` is not specified, `col_compress` will compress all columns in file
+
+If no compression `SCHEMES` are specified, all available schemes will be used 
 
 The `col_compress` executable is built in `./bin/`
 
