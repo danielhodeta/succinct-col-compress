@@ -21,7 +21,8 @@ class CompressCols {
     int SuccinctCompress();
     int LZ4Compress();
     void LZ4Decompress();
-    template<typename data_type> int DeltaEACompress();
+    template<typename data_type> int DeltaEAEncode();
+    template<typename data_type> void DeltaEADecode();
 
   public:
     
