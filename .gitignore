@@ -25,5 +25,7 @@ Makefile
 #external
 external/*
 
+#tests
+tests/*
 
 *.o
