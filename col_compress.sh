@@ -5,6 +5,8 @@
 #Usage:
 #   ./col_compress.sh FILE_NAME [-c COLUMN_NUMBER] [COMPRESSION SCHEME]*
 
+rm -f -r ./out/*                                           #Clean output folder
+
 schemes=("succinct" "lz4" "dea")
 
 if [ $# -eq 0 ];                                           #Check file is given
