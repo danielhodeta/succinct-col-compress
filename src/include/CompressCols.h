@@ -7,7 +7,8 @@ class CompressCols {
     
   private:
     std::string ifile_path;
-    std::string ofile_path;
+    std::string split_file_path;
+    std::string split_file_name;
     std::string scheme;
 
     int col_num;

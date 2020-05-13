@@ -5,6 +5,7 @@
 #include "lz4.h"
 #include "CompressCols.h"
 #include "delta_encoded_array.h"
+#include <sys/stat.h>
 
 
 //Class Contructor
@@ -15,11 +16,13 @@ CompressCols::CompressCols(std::string file_path, int col_num, bool limit_flag) 
     this->line_num = 0;
 
     size_t index {file_path.find_last_of("/", file_path.length())};
-    if (index == -1)
-        this->ofile_path = "./out/"+file_path+"_col_"+std::to_string(col_num)+".txt";
-    else
-        this->ofile_path = "./out/"+file_path.substr(index+1, file_path.length())+"_col_"+std::to_string(col_num)+".txt"; 
-
+    if (index == -1) {
+        this->split_file_name = file_path+"_col_"+std::to_string(col_num)+".txt";
+        this->split_file_path = "./out/"+this->split_file_name;
+    } else {
+        this->split_file_name = file_path.substr(index+1, file_path.length())+"_col_"+std::to_string(col_num)+".txt";
+        this->split_file_path = "./out/"+this->split_file_name; 
+    }
     
     this->split = false;
     this->limit_flag = limit_flag;
@@ -94,7 +97,7 @@ int CompressCols::Decompress() {
 int CompressCols::Split() {
 
     std::string ifp = this->ifile_path;
-    std::string ofp = this->ofile_path;
+    std::string sfp = this->split_file_path;
 
     FILE *fptr = fopen(ifp.c_str(), "r");
     
@@ -104,7 +107,7 @@ int CompressCols::Split() {
     }
     
     std::ofstream file_out;
-    file_out.open(ofp, std::ofstream::trunc);
+    file_out.open(sfp, std::ofstream::trunc);
 
 
     int line_count = 0;
@@ -151,10 +154,10 @@ int CompressCols::Split() {
 /* Succinct */
 
 int CompressCols::SuccinctCompress() {
-    std::string ofp = this->ofile_path;
-    auto *fd = new SuccinctFile(ofp);
+    std::string sfp = this->split_file_path;
+    auto *fd = new SuccinctFile(sfp);
 
-    fd->Serialize(ofp + ".succinct");
+    fd->Serialize(sfp + ".succinct");
 
     return 1;
 }
@@ -186,10 +189,10 @@ static size_t read_bin(FILE* fp, void* array, int arrayBytes)
 
 //LZ4 Compression function
 int CompressCols::LZ4Compress() {
-    std::string ofp = this->ofile_path;
+    std::string sfp = this->split_file_path;
 
-    FILE *inpFp = fopen(ofp.c_str(), "rb");
-    FILE *outFp = fopen((ofp+".lz4").c_str(), "wb");
+    FILE *inpFp = fopen(sfp.c_str(), "rb");
+    FILE *outFp = fopen((sfp+".lz4").c_str(), "wb");
 
     enum {
         messageMaxBytes   = 1024,
@@ -237,10 +240,10 @@ int CompressCols::LZ4Compress() {
 
 //LZ4 Decompression function
 void CompressCols::LZ4Decompress() {
-    std::string ofp = this->ofile_path;
+    std::string sfp = this->split_file_path;
     
-    FILE *inpFp = fopen((ofp+".lz4").c_str(), "rb");
-    FILE *outFp = fopen((ofp+".lz4.dec").c_str(), "wb");
+    FILE *inpFp = fopen((sfp+".lz4").c_str(), "rb");
+    FILE *outFp = fopen((sfp+".lz4.dec").c_str(), "wb");
 
     enum {
         messageMaxBytes   = 1024,
@@ -282,14 +285,14 @@ void CompressCols::LZ4Decompress() {
 
 /* Delta Endoded Array */
 
-//DEA Encoding and Serialization
+//DEA_Encoding and Serialization
 template<typename data_type>
 int CompressCols::DeltaEAEncode() {
-    
-    u_int64_t ln = this->line_num;
-    std::string ofp = this->ofile_path;
 
-    std::ifstream file_in (this->ofile_path);                                                //Reading split file
+    std::string delta_fp = "./out/"+this->split_file_name+".dea/";
+    if(mkdir(delta_fp.c_str(), 0666) == -1) return 0;
+
+    std::ifstream file_in (this->split_file_path);                                                //Reading split file
     std::string read_num;
     data_type *data_array = new data_type[this->line_num];                                   
     for (uint64_t i=0; i<line_num && (file_in >> read_num); i++) {                           //Converting strings to data_type and storing in array
@@ -298,13 +301,70 @@ int CompressCols::DeltaEAEncode() {
         read_stream >> data_array[i];
 
     }
+    file_in.close();
 
-    bitmap::EliasGammaDeltaEncodedArray<data_type> enc_array(data_array, ln);               //Encoding array
+    std::ofstream metadata (delta_fp+"metadata", std::ofstream::out);
+    std::ofstream unsorted (delta_fp+"unsorted", std::ofstream::out);
+    u_int64_t start = 0;
+    u_int64_t len = 1;
+    bool sorted = 0;
 
-    std::ofstream file_out;
-    file_out.open(ofp+".delta", std::ofstream::out);
-    enc_array.Serialize(file_out);                                                          //Serializing array
-    file_out.close();
+    for (u_int64_t i=0; i<this->line_num; i++) {
+        if (i==this->line_num-1) {
+            if (sorted) {
+                //do sorted end action
+                bitmap::EliasGammaDeltaEncodedArray<data_type> enc_array(data_array+start, len);               //Encoding array
+                std::ofstream file_out;
+                file_out.open(delta_fp+this->split_file_name+".delta_"+std::to_string(start), std::ofstream::out);
+                enc_array.Serialize(file_out);                                                          //Serializing array
+                file_out.close();
+
+                metadata<<start<<"\n";
+                metadata<<len<<"\n";
+                sorted = 0;
+                len = 1;
+            } else {
+                //do unsorted action
+                unsorted<<data_array[i]<<"\n";
+            }
+        } else {
+            if (data_array[i] < data_array[i+1]) {
+                if (!sorted) start = i;
+                sorted = 1;
+                len++;
+            } else {
+                if (sorted) {
+                    //do sorted end action
+                    bitmap::EliasGammaDeltaEncodedArray<data_type> enc_array(data_array+start, len);               //Encoding array
+                    std::ofstream file_out;
+                    file_out.open(delta_fp+this->split_file_name+".delta_"+std::to_string(start), std::ofstream::out);
+                    enc_array.Serialize(file_out);                                                          //Serializing array
+                    file_out.close();
+                    
+                    metadata<<start<<"\n";
+                    metadata<<len<<"\n";
+                    sorted = 0;
+                    len = 1;
+                } else {
+                    //do unsorted action
+                    unsorted<<data_array[i]<<"\n";
+                }
+            }
+        }
+
+    }
+    metadata<<std::to_string(this->line_num)<<"\n";                                 //Sentry
+    metadata<<"-1";
+
+    metadata.close();
+    unsorted.close();
+    
+    // bitmap::EliasGammaDeltaEncodedArray<data_type> enc_array(data_array, ln);               //Encoding array
+
+    // std::ofstream file_out;
+    // file_out.open(sfp+".delta", std::ofstream::out);
+    // enc_array.Serialize(file_out);                                                          //Serializing array
+    // file_out.close();
     
     return 1;
 }
@@ -313,19 +373,52 @@ int CompressCols::DeltaEAEncode() {
 template<typename data_type>
 void CompressCols::DeltaEADecode() {
 
-    std::string ofp = this->ofile_path;
+    std::string delta_fp = "./out/"+this->split_file_name+".dea/";
+    std::ifstream metadata (delta_fp+"metadata", std::ifstream::in);
+    std::ifstream unsorted (delta_fp+"unsorted", std::ifstream::in);
+    std::ofstream decoded (this->split_file_path+".dea_dec", std::ifstream::out);
+    
+    u_int64_t next_start;
+    u_int64_t next_len;
 
-    bitmap::EliasGammaDeltaEncodedArray<data_type> dec_array(NULL, 0);
-    std::ifstream file_in;
-    file_in.open(ofp+".delta", std::ofstream::in);
-    dec_array.Deserialize(file_in);
-
-    std::ofstream file_out;
-    file_out.open(ofp+".delta.dec", std::ofstream::out);
-    for (uint64_t i=0; i<this->line_num; i++) {                                               //Printing after deserialize
-        file_out<<dec_array[i]<<"\n";
+    metadata >> next_start;
+    metadata >> next_len;
+    for (int i=0; i<this->line_num;) {
+        if(i<next_start) {
+            std::string read;
+            unsorted >> read;
+            decoded << read + "\n";
+            i++;
+        } else if (i == next_start) {
+            bitmap::EliasGammaDeltaEncodedArray<data_type> dec_array(NULL, 0);
+            std::ifstream file_in (delta_fp+this->split_file_name+".delta_"+std::to_string(next_start), std::ifstream::in);
+            dec_array.Deserialize(file_in);
+            for (int j=0; j<next_len; j++) {
+                decoded<<dec_array[j]<<"\n";
+                i++;
+            }
+            metadata >> next_start;
+            metadata >> next_len;
+            file_in.close();
+        } else {
+            i++;
+        }
     }
-    file_in.close();
-    file_out.close();
+    unsorted.close();
+    decoded.close();
+    metadata.close();
+
+    // bitmap::EliasGammaDeltaEncodedArray<data_type> dec_array(NULL, 0);
+    // std::ifstream file_in;
+    // file_in.open(sfp+".delta", std::ofstream::in);
+    // dec_array.Deserialize(file_in);
+
+    // std::ofstream file_out;
+    // file_out.open(sfp+".delta.dec", std::ofstream::out);
+    // for (uint64_t i=0; i<this->line_num; i++) {                                               //Printing after deserialize
+    //     file_out<<dec_array[i]<<"\n";
+    // }
+    // file_in.close();
+    // file_out.close();
 
 }
