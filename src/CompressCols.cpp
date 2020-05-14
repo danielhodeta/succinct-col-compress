@@ -290,7 +290,7 @@ template<typename data_type>
 int CompressCols::DeltaEAEncode() {
 
     std::string delta_fp = "./out/"+this->split_file_name+".dea/";
-    if(mkdir(delta_fp.c_str(), 0666) == -1) return 0;
+    if(mkdir(delta_fp.c_str(), 0777) == -1) return 0;
 
     std::ifstream file_in (this->split_file_path);                                                //Reading split file
     std::string read_num;
