@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
         std::string scheme = argv[i];
 
         if(cfile->Compress(scheme))
-            std::cout<<"Compressed column "+std::to_string(col_num)+" using "+scheme+".\n";
+            std::cout<<"compressed column "+std::to_string(col_num)+" using "+scheme+".\n";
         else
             std::cout<<scheme + " compression unsuccessful for column "+std::to_string(col_num)+".\n";
 

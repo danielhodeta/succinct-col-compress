@@ -32,7 +32,7 @@ CompressCols::CompressCols(std::string file_path, int col_num, bool limit_flag) 
 
 //Compression function
 int CompressCols::Compress(std::string scheme) {
-    if (!this->split) this->Split();
+    if (!this->split) this->Split() && std::cout<<"split column "<<this->col_num<<" successfully.\n";
 
     this->scheme = scheme;
 
@@ -304,10 +304,11 @@ int CompressCols::DeltaEAEncode() {
     file_in.close();
 
     std::ofstream metadata (delta_fp+"metadata", std::ofstream::out);
-    std::ofstream unsorted (delta_fp+"unsorted", std::ofstream::out);
     u_int64_t start = 0;
     u_int64_t len = 1;
     bool sorted = 0;
+
+    std::ofstream unsorted;
 
     for (u_int64_t i=0; i<this->line_num; i++) {
         if (i==this->line_num-1) {
@@ -326,10 +327,15 @@ int CompressCols::DeltaEAEncode() {
             } else {
                 //do unsorted action
                 unsorted<<data_array[i]<<"\n";
+                unsorted.close();
+
             }
         } else {
             if (data_array[i] < data_array[i+1]) {
-                if (!sorted) start = i;
+                if (!sorted) {
+                    unsorted.close();
+                    start = i;
+                }
                 sorted = 1;
                 len++;
             } else {
@@ -340,13 +346,14 @@ int CompressCols::DeltaEAEncode() {
                     file_out.open(delta_fp+this->split_file_name+".delta_"+std::to_string(start), std::ofstream::out);
                     enc_array.Serialize(file_out);                                                          //Serializing array
                     file_out.close();
-                    
+
                     metadata<<start<<"\n";
                     metadata<<len<<"\n";
                     sorted = 0;
                     len = 1;
                 } else {
                     //do unsorted action
+                    unsorted.open(delta_fp+"unsorted_"+std::to_string(i), std::ofstream::out);
                     unsorted<<data_array[i]<<"\n";
                 }
             }
@@ -359,14 +366,53 @@ int CompressCols::DeltaEAEncode() {
     metadata.close();
     unsorted.close();
     
-    // bitmap::EliasGammaDeltaEncodedArray<data_type> enc_array(data_array, ln);               //Encoding array
-
-    // std::ofstream file_out;
-    // file_out.open(sfp+".delta", std::ofstream::out);
-    // enc_array.Serialize(file_out);                                                          //Serializing array
-    // file_out.close();
-    
     return 1;
+}
+
+//DEA Deserialization
+template<typename data_type>
+int CompressCols::DeltaEAIndexAt(u_int64_t index) {
+
+    std::string delta_fp = "./out/"+this->split_file_name+".dea/";
+    std::ifstream metadata (delta_fp+"metadata", std::ifstream::in);
+    std::vector<u_int64_t> meta_d;
+    u_int64_t i;
+
+    while(metadata.peek()!=EOF) {
+        metadata >> i;
+        meta_d.push_back(i);
+    }
+
+    for (int j=0; j<meta_d.size(); j+=2) {
+        if (meta_d[j]==index) {
+            bitmap::EliasGammaDeltaEncodedArray<data_type> dec_array(NULL, 0);
+            std::ifstream file_in (delta_fp+this->split_file_name+".delta_"+std::to_string(meta_d[j]), std::ifstream::in);
+            dec_array.Deserialize(file_in);
+            file_in.close();
+            return dec_array[0];
+        } else if (meta_d[j]>index) {
+            if (j!=0 && meta_d[j-2]<=index && index<meta_d[j-2]+meta_d[j-1]) {
+                bitmap::EliasGammaDeltaEncodedArray<data_type> dec_array(NULL, 0);
+                std::ifstream file_in (delta_fp+this->split_file_name+".delta_"+std::to_string(meta_d[j-2]), std::ifstream::in);
+                dec_array.Deserialize(file_in);
+                file_in.close();
+                return dec_array[index-meta_d[j-2]];
+            } else if (j!=0 && meta_d[j-2]<=index && index>=meta_d[j-2]+meta_d[j-1]) {
+                std::ifstream file_in (delta_fp+"unsorted_"+std::to_string(meta_d[j-2]+meta_d[j-1]), std::ifstream::in);
+                std::vector<u_int64_t> unsorted;
+                u_int64_t temp;
+                while(file_in.peek()!=EOF) {
+                    file_in >> temp;
+                    unsorted.push_back(temp);
+                }
+                file_in.close();
+                return unsorted[index-(meta_d[j-2]+meta_d[j-1])];
+            }
+        }
+
+    }
+
+
 }
 
 //DEA Deserialization
@@ -374,51 +420,10 @@ template<typename data_type>
 void CompressCols::DeltaEADecode() {
 
     std::string delta_fp = "./out/"+this->split_file_name+".dea/";
-    std::ifstream metadata (delta_fp+"metadata", std::ifstream::in);
-    std::ifstream unsorted (delta_fp+"unsorted", std::ifstream::in);
     std::ofstream decoded (this->split_file_path+".dea_dec", std::ifstream::out);
     
-    u_int64_t next_start;
-    u_int64_t next_len;
+    for (int i=0; i<this->line_num; i++) decoded<<this->DeltaEAIndexAt<u_int64_t>(i)<<"\n";
 
-    metadata >> next_start;
-    metadata >> next_len;
-    for (int i=0; i<this->line_num;) {
-        if(i<next_start) {
-            std::string read;
-            unsorted >> read;
-            decoded << read + "\n";
-            i++;
-        } else if (i == next_start) {
-            bitmap::EliasGammaDeltaEncodedArray<data_type> dec_array(NULL, 0);
-            std::ifstream file_in (delta_fp+this->split_file_name+".delta_"+std::to_string(next_start), std::ifstream::in);
-            dec_array.Deserialize(file_in);
-            for (int j=0; j<next_len; j++) {
-                decoded<<dec_array[j]<<"\n";
-                i++;
-            }
-            metadata >> next_start;
-            metadata >> next_len;
-            file_in.close();
-        } else {
-            i++;
-        }
-    }
-    unsorted.close();
     decoded.close();
-    metadata.close();
-
-    // bitmap::EliasGammaDeltaEncodedArray<data_type> dec_array(NULL, 0);
-    // std::ifstream file_in;
-    // file_in.open(sfp+".delta", std::ofstream::in);
-    // dec_array.Deserialize(file_in);
-
-    // std::ofstream file_out;
-    // file_out.open(sfp+".delta.dec", std::ofstream::out);
-    // for (uint64_t i=0; i<this->line_num; i++) {                                               //Printing after deserialize
-    //     file_out<<dec_array[i]<<"\n";
-    // }
-    // file_in.close();
-    // file_out.close();
 
 }

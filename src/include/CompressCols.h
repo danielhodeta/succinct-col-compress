@@ -24,6 +24,7 @@ class CompressCols {
     void LZ4Decompress();
     template<typename data_type> int DeltaEAEncode();
     template<typename data_type> void DeltaEADecode();
+    template<typename data_type> int DeltaEAIndexAt(u_int64_t index);
 
   public:
     
