@@ -22,9 +22,9 @@ class CompressCols {
     int SuccinctCompress();
     int LZ4Compress();
     void LZ4Decompress();
-    template<typename data_type> int DeltaEAEncode();
-    template<typename data_type> void DeltaEADecode();
-    template<typename data_type> int DeltaEAIndexAt(u_int64_t index);
+    template<typename T> int DeltaEAEncode();
+    template<typename T> void DeltaEADecode();
+    template<typename T> T DeltaEAIndexAt(u_int64_t index);
 
   public:
     

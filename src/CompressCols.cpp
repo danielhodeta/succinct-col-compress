@@ -124,6 +124,14 @@ int CompressCols::Split() {
 
             std::string cell_data = line_read.substr(0,
                                             line_read.find(' '));       //This is the string we want to store in the table      
+            
+            while (cell_data.compare("")==0) {                            //Skip empty strings
+                line_read = line_read.substr(line_read.find(' ')+1, 
+                                        line_read.size());
+                cell_data = line_read.substr(0,
+                                            line_read.find(' '));
+            }
+            
             if(i==this->col_num-1) {                                            //Write to file
                 file_out << cell_data << '\n';
                 line_count++;              
@@ -285,8 +293,46 @@ void CompressCols::LZ4Decompress() {
 
 /* Delta Endoded Array */
 
+template<typename T>
+static T* merge_sort (T* data_array, u_int64_t size) {
+
+    if (size == 1) {
+        return data_array;
+    } else if (size == 2) {
+
+        if (data_array[0] > data_array[1]) {
+            T temp = data_array[1];
+            data_array[1] = data_array[0];
+            data_array[0] = temp;
+        }
+        return data_array;
+    } else {
+        u_int64_t midpoint = (size - 1)/2; //left = 0-mid (mid+1)  right = mid+1 - size-1 (size-1-mid)
+        T* left = merge_sort(data_array, midpoint+1);
+        T* right = merge_sort(data_array+(midpoint+1), size-(midpoint+1));
+
+        u_int64_t l=0; 
+        u_int64_t r=0;
+
+        T* sorted = new T[size];
+
+        for (u_int64_t i=0; i<size; i++) {
+            if (r >= size-midpoint-1) {sorted[i] = left[l++]; continue;}
+            if (l >= midpoint+1) {sorted[i] = right[r++]; continue;}
+
+            if (left[l] < right[r]) sorted[i] = left[l++];
+            else sorted[i] = right[r++];
+            
+        }
+        assert(r+l == size);
+
+        return sorted;
+
+    }
+}
+
 //DEA_Encoding and Serialization
-template<typename data_type>
+template<typename T>
 int CompressCols::DeltaEAEncode() {
 
     std::string delta_fp = "./out/"+this->split_file_name+".dea/";
@@ -294,13 +340,19 @@ int CompressCols::DeltaEAEncode() {
 
     std::ifstream file_in (this->split_file_path);                                                //Reading split file
     std::string read_num;
-    data_type *data_array = new data_type[this->line_num];                                   
-    for (uint64_t i=0; i<line_num && (file_in >> read_num); i++) {                           //Converting strings to data_type and storing in array
+    T *data_array = new T[this->line_num];                                   
+    for (uint64_t i=0; i<line_num && (file_in >> read_num); i++) {                           //Converting strings to T and storing in array
 
         std::istringstream read_stream (read_num);
         read_stream >> data_array[i];
 
     }
+
+    //Sort
+    T* sorted_data = merge_sort<T>(data_array, line_num);
+    delete[] data_array;
+    data_array = sorted_data;
+
     file_in.close();
 
     std::ofstream metadata (delta_fp+"metadata", std::ofstream::out);
@@ -314,9 +366,9 @@ int CompressCols::DeltaEAEncode() {
         if (i==this->line_num-1) {
             if (sorted) {
                 //do sorted end action
-                bitmap::EliasGammaDeltaEncodedArray<data_type> enc_array(data_array+start, len);               //Encoding array
+                bitmap::EliasGammaDeltaEncodedArray<T> enc_array(data_array+start, len);               //Encoding array
                 std::ofstream file_out;
-                file_out.open(delta_fp+this->split_file_name+".delta_"+std::to_string(start), std::ofstream::out);
+                file_out.open(delta_fp+this->split_file_name+".dea_"+std::to_string(start), std::ofstream::out);
                 enc_array.Serialize(file_out);                                                          //Serializing array
                 file_out.close();
 
@@ -341,9 +393,9 @@ int CompressCols::DeltaEAEncode() {
             } else {
                 if (sorted) {
                     //do sorted end action
-                    bitmap::EliasGammaDeltaEncodedArray<data_type> enc_array(data_array+start, len);               //Encoding array
+                    bitmap::EliasGammaDeltaEncodedArray<T> enc_array(data_array+start, len);               //Encoding array
                     std::ofstream file_out;
-                    file_out.open(delta_fp+this->split_file_name+".delta_"+std::to_string(start), std::ofstream::out);
+                    file_out.open(delta_fp+this->split_file_name+".dea_"+std::to_string(start), std::ofstream::out);
                     enc_array.Serialize(file_out);                                                          //Serializing array
                     file_out.close();
 
@@ -353,7 +405,8 @@ int CompressCols::DeltaEAEncode() {
                     len = 1;
                 } else {
                     //do unsorted action
-                    unsorted.open(delta_fp+"unsorted_"+std::to_string(i), std::ofstream::out);
+                    if (!unsorted.is_open())
+                        unsorted.open(delta_fp+"unsorted_"+std::to_string(i), std::ofstream::out);
                     unsorted<<data_array[i]<<"\n";
                 }
             }
@@ -370,13 +423,15 @@ int CompressCols::DeltaEAEncode() {
 }
 
 //DEA Deserialization
-template<typename data_type>
-int CompressCols::DeltaEAIndexAt(u_int64_t index) {
+template<typename T>
+T CompressCols::DeltaEAIndexAt(u_int64_t index) {
 
     std::string delta_fp = "./out/"+this->split_file_name+".dea/";
     std::ifstream metadata (delta_fp+"metadata", std::ifstream::in);
+    std::ifstream file_in;
     std::vector<u_int64_t> meta_d;
     u_int64_t i;
+
 
     while(metadata.peek()!=EOF) {
         metadata >> i;
@@ -385,20 +440,25 @@ int CompressCols::DeltaEAIndexAt(u_int64_t index) {
 
     for (int j=0; j<meta_d.size(); j+=2) {
         if (meta_d[j]==index) {
-            bitmap::EliasGammaDeltaEncodedArray<data_type> dec_array(NULL, 0);
-            std::ifstream file_in (delta_fp+this->split_file_name+".delta_"+std::to_string(meta_d[j]), std::ifstream::in);
+            bitmap::EliasGammaDeltaEncodedArray<T> dec_array(NULL, 0);
+            file_in.open(delta_fp+this->split_file_name+".dea_"+std::to_string(meta_d[j]), std::ifstream::in);
             dec_array.Deserialize(file_in);
             file_in.close();
             return dec_array[0];
         } else if (meta_d[j]>index) {
-            if (j!=0 && meta_d[j-2]<=index && index<meta_d[j-2]+meta_d[j-1]) {
-                bitmap::EliasGammaDeltaEncodedArray<data_type> dec_array(NULL, 0);
-                std::ifstream file_in (delta_fp+this->split_file_name+".delta_"+std::to_string(meta_d[j-2]), std::ifstream::in);
+            if (j!=0  && index<meta_d[j-2]+meta_d[j-1]) {
+                bitmap::EliasGammaDeltaEncodedArray<T> dec_array(NULL, 0);
+                file_in.open(delta_fp+this->split_file_name+".dea_"+std::to_string(meta_d[j-2]), std::ifstream::in);
                 dec_array.Deserialize(file_in);
                 file_in.close();
                 return dec_array[index-meta_d[j-2]];
-            } else if (j!=0 && meta_d[j-2]<=index && index>=meta_d[j-2]+meta_d[j-1]) {
-                std::ifstream file_in (delta_fp+"unsorted_"+std::to_string(meta_d[j-2]+meta_d[j-1]), std::ifstream::in);
+            } else { 
+                if (j!=0)
+                    file_in.open(delta_fp+"unsorted_"+std::to_string(meta_d[j-2]+meta_d[j-1]), std::ifstream::in);
+                else
+                    file_in.open(delta_fp+"unsorted_"+std::to_string(j), std::ifstream::in);
+            
+
                 std::vector<u_int64_t> unsorted;
                 u_int64_t temp;
                 while(file_in.peek()!=EOF) {
@@ -406,17 +466,20 @@ int CompressCols::DeltaEAIndexAt(u_int64_t index) {
                     unsorted.push_back(temp);
                 }
                 file_in.close();
-                return unsorted[index-(meta_d[j-2]+meta_d[j-1])];
+
+                if (j!=0)
+                    return unsorted[index-(meta_d[j-2]+meta_d[j-1])];
+                else
+                    return unsorted[index - j];
             }
         }
-
     }
 
 
 }
 
 //DEA Deserialization
-template<typename data_type>
+template<typename T>
 void CompressCols::DeltaEADecode() {
 
     std::string delta_fp = "./out/"+this->split_file_name+".dea/";
