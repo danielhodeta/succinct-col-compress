@@ -378,10 +378,11 @@ int CompressCols::DeltaEAEncode() {
                 len = 1;
             } else {
                 //do unsorted action
-                if (!unsorted.is_open())
+                if (!unsorted.is_open()) {
                     unsorted.open(delta_fp+"unsorted_"+std::to_string(i), std::ofstream::out);
-                unsorted<<data_array[i]<<"\n";
-                unsorted.close();
+                    unsorted<<data_array[i]<<"\n";
+                    unsorted.close();
+                }
 
             }
         } else {
@@ -407,9 +408,10 @@ int CompressCols::DeltaEAEncode() {
                     len = 1;
                 } else {
                     //do unsorted action
-                    if (!unsorted.is_open())
+                    if (!unsorted.is_open()) {
                         unsorted.open(delta_fp+"unsorted_"+std::to_string(i), std::ofstream::out);
-                    unsorted<<data_array[i]<<"\n";
+                        unsorted<<data_array[i]<<"\n";
+                    }
                 }
             }
         }
@@ -469,10 +471,7 @@ T CompressCols::DeltaEAIndexAt(u_int64_t index) {
                 }
                 file_in.close();
 
-                if (j!=0)
-                    return unsorted[index-(meta_d[j-2]+meta_d[j-1])];
-                else
-                    return unsorted[index - j];
+                return unsorted[0];
             }
         }
     }
