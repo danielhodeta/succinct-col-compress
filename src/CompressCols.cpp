@@ -378,6 +378,8 @@ int CompressCols::DeltaEAEncode() {
                 len = 1;
             } else {
                 //do unsorted action
+                if (!unsorted.is_open())
+                    unsorted.open(delta_fp+"unsorted_"+std::to_string(i), std::ofstream::out);
                 unsorted<<data_array[i]<<"\n";
                 unsorted.close();
 
