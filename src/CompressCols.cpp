@@ -371,7 +371,7 @@ int CompressCols::DeltaEAEncode() {
     u_int64_t run_count = 0;
     u_int64_t uncompressed_count = 0;                                     
 
-    int run_threshold = 5;
+    int run_threshold =5;
 
     //States
     bool sorted = 0;
