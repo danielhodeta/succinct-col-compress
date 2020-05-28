@@ -102,7 +102,6 @@ int CompressCols::Decompress() {
 
 //File splitting function
 int CompressCols::Split(std::string file_path, int total_col_num) {
-    std::cout<<file_path<<"\n";
     size_t index {file_path.find_last_of("/", file_path.length())};
     std::string split_file_path_prefix;
     if (index == -1) {
