@@ -6,6 +6,7 @@
 #include "compress_cols.h"
 #include "delta_encoded_array.h"
 #include <sys/stat.h>
+#include <sys/time.h>
 
 //Static Variable Definition
 
@@ -14,6 +15,16 @@ u_int64_t CompressCols::line_num_ = 0;
 int CompressCols::total_col_num_ = 0;
 bool CompressCols::limit_flag_ = 0;
 std::string CompressCols::ifile_path_ = "";
+
+//Time Stamp
+typedef unsigned long long int timestamp_t;
+
+static timestamp_t get_timestamp() {
+  struct timeval now{};
+  gettimeofday(&now, nullptr);
+
+  return (now.tv_usec + (time_t) now.tv_sec * 1000000);
+}
 
 //Class Contructor
 CompressCols::CompressCols(std::string file_path, int total_col_num, int col_num, bool limit_flag) {
@@ -39,26 +50,54 @@ CompressCols::CompressCols(std::string file_path, int total_col_num, int col_num
 
 //Compression function
 int CompressCols::Compress(std::string scheme) {
-    if (!split_) this->Split() && std::cout<<"split columns successfully.\n";
+    if (!split_) this->Split();
     
     this->scheme_ = scheme;
 
+    timestamp_t start,total_time;
     int return_val = 0;
 
     switch (this->scheme_.c_str()[0]) {
         case 's':
             if (this->scheme_!="succinct") break;
+
+            start = get_timestamp();
             return_val = this->SuccinctCompress();
+            total_time = get_timestamp() - start;
+            
+            if (return_val) {
+                std::cout<<"compressed column "+std::to_string(col_num_)+" using "+scheme_+",";
+                std::cout<<" time taken: "<<total_time/1000000.0<<"\n";
+            }
+
             this->compressed_ = true;
             break;
         case 'l':
             if (this->scheme_!="lz4") break;
+
+            start = get_timestamp();
             return_val = this->LZ4Compress();
+            total_time = get_timestamp() - start;
+            
+            if (return_val) {
+                std::cout<<"compressed column "+std::to_string(col_num_)+" using "+scheme_+",";
+                std::cout<<" time taken: "<<total_time/1000000.0<<"\n";
+            }
+
             this->compressed_ = true;
             break;
         case 'd':
             if (this->scheme_!="dea") break;
+
+            start = get_timestamp(); 
             return_val = this->DeltaEAEncode<u_int64_t>();
+            total_time = get_timestamp() - start;
+
+            if (return_val) {
+                std::cout<<"compressed column "+std::to_string(col_num_)+" using "+scheme_+",";
+                std::cout<<" time taken: "<<total_time/1000000.0<<"\n";
+            }
+
             this->compressed_ = true;
             break;
         default:
@@ -102,6 +141,9 @@ int CompressCols::Decompress() {
 
 //File splitting function
 int CompressCols::Split(std::string file_path, int total_col_num) {
+
+    timestamp_t start = get_timestamp();
+
     size_t index {file_path.find_last_of("/", file_path.length())};
     std::string split_file_path_prefix;
     if (index == -1) {
@@ -173,6 +215,9 @@ int CompressCols::Split(std::string file_path, int total_col_num) {
     }
     fclose(fptr);
     split_ = true;
+
+    timestamp_t total_time = get_timestamp() - start;
+    std::cout<<"split columns successfully, time taken: "<<total_time/1000000.0<<"\n";
     return 1;
 
 }
