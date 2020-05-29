@@ -12,9 +12,9 @@ This program splits a given file into columns and compresses each column. It ass
  
 **Compression Schemes**
 
-- Succinct (Column: TBD)
-- LZ4 (Column: TBD)
-- Delta-Encoded Array (Column: TBD)
+- Succinct [accessible by: `succinct`] (Column: TBD)
+- LZ4 [accessible by: `lz4`] (Column: TBD)
+- Delta-Encoded Array [accessible by: `dea`] (Column: TBD)
 
 If `COL_NUM` is not specified, `col_compress` will compress all columns in file
 

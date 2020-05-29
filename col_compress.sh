@@ -5,6 +5,10 @@
 #Usage:
 #   ./col_compress.sh FILE_NAME [-c COLUMN_NUMBER] [COMPRESSION SCHEME]*
 
+rm -f -r ./out/*                                           #Clean output folder
+
+schemes=("succinct" "lz4" "dea")
+TOTAL_COLS=$(head -n 1 $1 | wc -w) 
 
 if [ $# -eq 0 ];                                           #Check file is given
 then
@@ -12,12 +16,9 @@ then
 
 elif [ $# -eq 1 ];                                         #Only file name given
 then 
-    col_num=$(head -n 1 $1 | wc -w)                     
-    for (( i=1; i<=$col_num; i++ ))
-    do 
-        ./bin/col_compress $@ $i "succinct" "lz4"
-        echo
-    done  
+                         
+    ./bin/col_compress $@ $TOTAL_COLS ${schemes[@]}
+    echo 
 
 else
     if [ $# -gt 3 ] && [ $2 = '-c' ];                      #File name and column number given              
@@ -40,16 +41,12 @@ else
         then 
             echo "column number must be at least 1"
         else
-            ./bin/col_compress $1 $3 "succinct" "lz4"
+            ./bin/col_compress $1 $3 ${schemes[@]}
             echo
         fi
-    else                                                    #File name and column number given
-        col_num=$(head -n 1 $1 | wc -w)                     
-        for (( i=1; i<=$col_num; i++ ))
-        do 
-            ./bin/col_compress $1 $i ${@:2}
-            echo
-        done 
+    else                                                    #File name and compression schemes given                    
+        ./bin/col_compress $1 $TOTAL_COLS ${@:2}
+        echo
     fi
     
 fi

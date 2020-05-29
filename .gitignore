@@ -4,6 +4,9 @@ data/*
 #Build
 build/*
 
+#Scripts
+scripts
+
 #Bin
 bin/*
 
