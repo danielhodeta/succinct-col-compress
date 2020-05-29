@@ -167,7 +167,7 @@ int CompressCols::Split(std::string file_path, int total_col_num) {
     
     if (!fptr) {
         std::cerr<<"SplitToCol: invalid file!\n";
-        return 0;
+        exit(1);
     }
     
     // std::ofstream file_out;
@@ -202,12 +202,13 @@ int CompressCols::Split(std::string file_path, int total_col_num) {
             line_read = line_read.substr(line_read.find(' ')+1, 
                                         line_read.size());
         }   
-        line_count++;                                                                   
+        line_count++;
+        free(buffer);                                                                   
         buffer = nullptr;                                               //Reinitializing buffer and n for getline
         n = 0;
 
     }
-
+    free(buffer);
     line_num_ = line_count;
     
     for (int i=0; i<total_col_num; i++) {
@@ -452,10 +453,9 @@ int CompressCols::DeltaEAEncode() {
 
     auto *rdx = new MultiKeyRdxPat::MKRdxPat<RDXData>(MAX_RDX_NODES, NUM_KEYS, MAX_KEY_BYTES);
     
+    
     //Sort
-    std::cout<<"sorting...\n";
     DataWithIndexStruct<T>* sorted_data = MergeSort<T>(data_array_with_index, line_num_);
-    std::cout<<"done sorting.";
     delete[] data_array_with_index;
     T* data_array = new T[line_num_];
     for (int i=0; i<line_num_; i++) {
@@ -472,9 +472,11 @@ int CompressCols::DeltaEAEncode() {
             exit(1);
         }
         delete[] key;
+        //std::cout<<"checl\n";
         //delete index_data;
     }
     delete[] sorted_data;
+    delete rdx;
 
     
 
@@ -594,7 +596,8 @@ int CompressCols::DeltaEAEncode() {
     run.close();
     dea.close();
     metadata.close();
-    
+
+    delete[] data_array;
     return 1;
 }
 
