@@ -166,7 +166,7 @@ int CompressCols::Split(std::string file_path, int total_col_num) {
     
     if (!fptr) {
         std::cerr<<"SplitToCol: invalid file!\n";
-        return 0;
+        exit(1);
     }
     
     // std::ofstream file_out;
@@ -201,12 +201,13 @@ int CompressCols::Split(std::string file_path, int total_col_num) {
             line_read = line_read.substr(line_read.find(' ')+1, 
                                         line_read.size());
         }   
-        line_count++;                                                                   
+        line_count++;
+        free(buffer);                                                                   
         buffer = nullptr;                                               //Reinitializing buffer and n for getline
         n = 0;
 
     }
-
+    free(buffer);
     line_num_ = line_count;
     
     for (int i=0; i<total_col_num; i++) {
@@ -544,7 +545,8 @@ int CompressCols::DeltaEAEncode() {
     run.close();
     dea.close();
     metadata.close();
-    
+
+    delete[] data_array;
     return 1;
 }
 
