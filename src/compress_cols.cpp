@@ -7,6 +7,7 @@
 #include "delta_encoded_array.h"
 #include <sys/stat.h>
 #include <sys/time.h>
+#include "MKRdxPat.hpp"
 
 //Static Variable Definition
 
@@ -364,33 +365,43 @@ void CompressCols::LZ4Decompress() {
 /* Delta Endoded Array */
 
 template<typename T>
-static T* MergeSort (T* data_array, u_int64_t size) {
+struct DataWithIndexStruct {
+    T data_point;
+    int index;
+};
+
+struct RDXData {
+    int index;
+};
+
+template<typename T>
+static DataWithIndexStruct<T> * MergeSort (DataWithIndexStruct<T> *data_array, u_int64_t size) {
 
     if (size == 1) {
         return data_array;
     } else if (size == 2) {
 
-        if (data_array[0] > data_array[1]) {
-            T temp = data_array[1];
+        if (data_array[0].data_point > data_array[1].data_point) {
+            DataWithIndexStruct<T> temp = data_array[1];
             data_array[1] = data_array[0];
             data_array[0] = temp;
         }
         return data_array;
     } else {
         u_int64_t midpoint = (size - 1)/2; //left = 0-mid (mid+1)  right = mid+1 - size-1 (size-1-mid)
-        T* left = MergeSort(data_array, midpoint+1);
-        T* right = MergeSort(data_array+(midpoint+1), size-(midpoint+1));
+        DataWithIndexStruct<T>* left = MergeSort(data_array, midpoint+1);
+        DataWithIndexStruct<T>* right = MergeSort(data_array+(midpoint+1), size-(midpoint+1));
 
         u_int64_t l=0; 
         u_int64_t r=0;
 
-        T* sorted = new T[size];
+        DataWithIndexStruct<T> *sorted = new DataWithIndexStruct<T>[size];
 
         for (u_int64_t i=0; i<size; i++) {
             if (r >= size-midpoint-1) {sorted[i] = left[l++]; continue;}
             if (l >= midpoint+1) {sorted[i] = right[r++]; continue;}
 
-            if (left[l] < right[r]) sorted[i] = left[l++];
+            if (left[l].data_point < right[r].data_point) sorted[i] = left[l++];
             else sorted[i] = right[r++];
             
         }
@@ -413,20 +424,59 @@ int CompressCols::DeltaEAEncode() {
 
     std::ifstream file_in (this->split_file_path_);                                                //Reading split file
     std::string read_num;
-    T *data_array = new T[line_num_];                                   
+    DataWithIndexStruct<T> *data_array_with_index = new DataWithIndexStruct<T>[line_num_];                                   
     for (uint64_t i=0; i<line_num_ && (file_in >> read_num); i++) {                           //Converting strings to T and storing in array
 
         std::istringstream read_stream (read_num);
-        read_stream >> data_array[i];
+        read_stream >> data_array_with_index[i].data_point;
+        data_array_with_index[i].index = i;
 
     }
     file_in.close();
 
-    //Sort
-    T* sorted_data = MergeSort<T>(data_array, line_num_);
-    delete[] data_array;
-    data_array = sorted_data;
+    //Setting Up Patricia Trie
+    const int MAX_RDX_NODES = line_num_+1; //How many keys do you need
+    const int NUM_KEYS = 1;
+    const int MAX_KEY_BYTES = 4;            //Should actually be 8?
 
+    auto to_byte_array {
+        [&](int n) -> unsigned char* {
+            unsigned char * bytes = new unsigned char[MAX_KEY_BYTES+1];
+            bytes[0] = 1;
+            for (int i=0; i<MAX_KEY_BYTES; i++) {
+                bytes[i+1] = (n >> 8*(MAX_KEY_BYTES-i-1)) & 0xFF;
+            }
+            return bytes;
+        }
+    };
+
+    auto *rdx = new MultiKeyRdxPat::MKRdxPat<RDXData>(MAX_RDX_NODES, NUM_KEYS, MAX_KEY_BYTES);
+    
+    //Sort
+    std::cout<<"sorting...\n";
+    DataWithIndexStruct<T>* sorted_data = MergeSort<T>(data_array_with_index, line_num_);
+    std::cout<<"done sorting.";
+    delete[] data_array_with_index;
+    T* data_array = new T[line_num_];
+    for (int i=0; i<line_num_; i++) {
+        data_array[i] = sorted_data[i].data_point;
+
+        RDXData *index_data = new RDXData;
+        index_data->index=sorted_data[i].index;
+        unsigned char *key = to_byte_array(i);
+        
+        int return_code = rdx->insert((unsigned char *)key, &index_data);
+
+        if (return_code) {
+            std::cerr<<"DeltaEAEncode(): patricia is dying, error "<<return_code<<"!\n";
+            exit(1);
+        }
+        delete[] key;
+        //delete index_data;
+    }
+    delete[] sorted_data;
+
+    
 
     std::ofstream metadata (delta_fp+"metadata", std::ofstream::out);
     std::ofstream dea (delta_fp+this->split_file_name_+".dea");
