@@ -1,8 +1,12 @@
 #include <stdio.h>
 #include <cstring>
 #include <sstream>
+#include <assert.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
 #include "succinct_file.h"
-#include "lz4.h"
+#include "lz4frame.h"
 #include "compress_cols.h"
 #include "delta_encoded_array.h"
 #include <sys/stat.h>
@@ -244,123 +248,176 @@ int CompressCols::SuccinctCompress() {
 /*
 * LZ4
 * 
-* Code Source: lz4/examples/blockStreaming_lineByline.c
+* Code Source: lz4/examples/frameCompress.c
 */ 
 
-static size_t write_uint16(FILE* fp, uint16_t i) {
-    return fwrite(&i, sizeof(i), 1, fp);
-}
+#define IN_CHUNK_SIZE  (16*1024)
 
-static size_t write_bin(FILE* fp, const void* array, int arrayBytes)
+static const LZ4F_preferences_t kPrefs = {
+    { LZ4F_max256KB, LZ4F_blockLinked, LZ4F_noContentChecksum, LZ4F_frame,
+      0 /* unknown content size */, 0 /* no dictID */ , LZ4F_noBlockChecksum },
+    0,   /* compression level; 0 == default */
+    0,   /* autoflush */
+    0,   /* favor decompression speed */
+    { 0, 0, 0 },  /* reserved, must be set to 0 */
+};
+
+
+/* safe_fwrite() :
+ * performs fwrite(), ensure operation success, or immediately exit() */
+static void safe_fwrite(void* buf, size_t eltSize, size_t nbElt, FILE* f)
 {
-    return fwrite(array, 1, arrayBytes, fp);
+    size_t const writtenSize = fwrite(buf, eltSize, nbElt, f);
+    size_t const expectedSize = eltSize * nbElt;
+    if (nbElt > 0) assert(expectedSize / nbElt == eltSize);   /* check overflow */
+    if (writtenSize < expectedSize) {
+        if (ferror(f))  /* note : ferror() must follow fwrite */
+            ;//fprintf(stderr, "Write failed \n");
+        else
+            ;//fprintf(stderr, "Short write \n");
+        exit(1);
+    }
 }
 
-static size_t read_uint16(FILE* fp, uint16_t* i)
+typedef struct {
+    int error;
+    unsigned long long size_in;
+    unsigned long long size_out;
+} compressResult_t;
+
+static compressResult_t
+compress_file_internal(FILE* f_in, FILE* f_out,
+                       LZ4F_compressionContext_t ctx,
+                       void* inBuff,  size_t inChunkSize,
+                       void* outBuff, size_t outCapacity)
 {
-    return fread(i, sizeof(*i), 1, fp);
+    compressResult_t result = { 1, 0, 0 };  /* result for an error */
+    unsigned long long count_in = 0, count_out;
+
+    assert(f_in != NULL); assert(f_out != NULL);
+    assert(ctx != NULL);
+    assert(outCapacity >= LZ4F_HEADER_SIZE_MAX);
+    assert(outCapacity >= LZ4F_compressBound(inChunkSize, &kPrefs));
+
+    /* write frame header */
+    {   size_t const headerSize = LZ4F_compressBegin(ctx, outBuff, outCapacity, &kPrefs);
+        
+        if (LZ4F_isError(headerSize)) {
+            return result;
+        }
+        count_out = headerSize;
+        safe_fwrite(outBuff, 1, headerSize, f_out);
+    }
+    /* stream file */
+    for (;;) {
+        size_t const readSize = fread(inBuff, 1, IN_CHUNK_SIZE, f_in);
+        if (readSize == 0) break; /* nothing left to read from input file */
+        count_in += readSize;
+        size_t const compressedSize = LZ4F_compressUpdate(ctx,
+                                                outBuff, outCapacity,
+                                                inBuff, readSize,
+                                                NULL);
+        if (LZ4F_isError(compressedSize)) {
+            return result;
+        }
+        safe_fwrite(outBuff, 1, compressedSize, f_out);
+        count_out += compressedSize;
+    }
+    /* flush whatever remains within internal buffers */
+    {   size_t const compressedSize = LZ4F_compressEnd(ctx,
+                                                outBuff, outCapacity,
+                                                NULL);
+        if (LZ4F_isError(compressedSize)) {
+            return result;
+        }
+        safe_fwrite(outBuff, 1, compressedSize, f_out);
+        count_out += compressedSize;
+    }
+
+    result.size_in = count_in;
+    result.size_out = count_out;
+    result.error = 0;
+    return result;
 }
 
-static size_t read_bin(FILE* fp, void* array, int arrayBytes)
-{
-    return fread(array, 1, arrayBytes, fp);
-}
-
-//LZ4 Compression function
 int CompressCols::LZ4Compress() {
     std::string sfp = this->split_file_path_;
 
-    FILE *inpFp = fopen(sfp.c_str(), "rb");
-    FILE *outFp = fopen((sfp+".lz4").c_str(), "wb");
+    FILE * const f_in = fopen(sfp.c_str(), "rb");
+    FILE * const f_out = fopen((sfp+".lz4").c_str(), "wb");
 
-    enum {
-        messageMaxBytes   = 1024,
-        ringBufferBytes   = 1024 * 256 + messageMaxBytes,
-    };
+    assert(f_in != NULL);
+    assert(f_out != NULL);
 
-    LZ4_stream_t* const lz4Stream = LZ4_createStream();
-    const size_t cmpBufBytes = LZ4_COMPRESSBOUND(messageMaxBytes);
-    char* const cmpBuf = (char*) malloc(cmpBufBytes);
-    char* const inpBuf = (char*) malloc(ringBufferBytes);
-    int inpOffset = 0;
+    /* ressource allocation */
+    LZ4F_compressionContext_t ctx;
+    size_t const ctxCreation = LZ4F_createCompressionContext(&ctx, LZ4F_VERSION);
+    void* const src = malloc(IN_CHUNK_SIZE);
+    size_t const outbufCapacity = LZ4F_compressBound(IN_CHUNK_SIZE, &kPrefs);   /* large enough for any input <= IN_CHUNK_SIZE */
+    void* const outbuff = malloc(outbufCapacity);
 
-    for ( ; ; ) {
-
-        char* const inpPtr = &inpBuf[inpOffset];
-        // Read line to the ring buffer.
-        int inpBytes = 0;
-        if (!fgets(inpPtr, (int) messageMaxBytes, inpFp))
-            break;
-        inpBytes = (int) strlen(inpPtr);
-
-
-        {
-            const int cmpBytes = LZ4_compress_fast_continue(
-                lz4Stream, inpPtr, cmpBuf, inpBytes, cmpBufBytes, 1);
-            if (cmpBytes <= 0) break;
-            write_uint16(outFp, (uint16_t) cmpBytes);
-            write_bin(outFp, cmpBuf, cmpBytes);
-
-            // Add and wraparound the ringbuffer offset
-            inpOffset += inpBytes;
-            if ((size_t)inpOffset >= ringBufferBytes - messageMaxBytes) inpOffset = 0;
-        }
+    compressResult_t result = { 1, 0, 0 };  /* == error (default) */
+    if (!LZ4F_isError(ctxCreation) && src && outbuff) {
+        result = compress_file_internal(f_in, f_out,
+                                        ctx,
+                                        src, IN_CHUNK_SIZE,
+                                        outbuff, outbufCapacity);
+    } else {
+        return 0;
     }
-    write_uint16(outFp, 0);
 
-    fclose(inpFp);
-    fclose(outFp);
-    free(inpBuf);
-    free(cmpBuf);
-    LZ4_freeStream(lz4Stream);
-
+    LZ4F_freeCompressionContext(ctx);   /* supports free on NULL */
+    free(src);
+    free(outbuff);
+    // free(f_in);
+    // free(f_out);
     return 1;
 }
 
 //LZ4 Decompression function
-void CompressCols::LZ4Decompress() {
-    std::string sfp = this->split_file_path_;
+ void CompressCols::LZ4Decompress() {
+//     std::string ofp = this->ofile_path;
     
-    FILE *inpFp = fopen((sfp+".lz4").c_str(), "rb");
-    FILE *outFp = fopen((sfp+".lz4.dec").c_str(), "wb");
+//     FILE *inpFp = fopen((ofp+".lz4").c_str(), "rb");
+//     FILE *outFp = fopen((ofp+".lz4.dec").c_str(), "wb");
 
-    enum {
-        messageMaxBytes   = 1024,
-        ringBufferBytes   = 1024 * 256 + messageMaxBytes,
-    };
+//     enum {
+//         messageMaxBytes   = 1024,
+//         ringBufferBytes   = 1024 * 256 + messageMaxBytes,
+//     };
 
-    LZ4_streamDecode_t* const lz4StreamDecode = LZ4_createStreamDecode();
-    char* const cmpBuf = (char*) malloc(LZ4_COMPRESSBOUND(messageMaxBytes));
-    char* const decBuf = (char*) malloc(ringBufferBytes);
-    int decOffset = 0;
-    
-    for ( ; ; )
-    {
-        uint16_t cmpBytes = 0;
+//     LZ4_streamDecode_t* const lz4StreamDecode = LZ4_createStreamDecode();
+//     char* const cmpBuf = (char*) malloc(LZ4_COMPRESSBOUND(messageMaxBytes));
+//     char* const decBuf = (char*) malloc(ringBufferBytes);
+//     int decOffset = 0;
 
-        if (read_uint16(inpFp, &cmpBytes) != 1) break;
-        if (cmpBytes == 0) break;
-        if (read_bin(inpFp, cmpBuf, cmpBytes) != cmpBytes) break;
+//     for ( ; ; )
+//     {
+//         uint16_t cmpBytes = 0;
 
-        {
-            char* const decPtr = &decBuf[decOffset];
-            const int decBytes = LZ4_decompress_safe_continue(
-                lz4StreamDecode, cmpBuf, decPtr, cmpBytes, (int) messageMaxBytes);
-            if (decBytes <= 0) break;
-            write_bin(outFp, decPtr, decBytes);
+//         if (read_uint16(inpFp, &cmpBytes) != 1) break;
+//         if (cmpBytes == 0) break;
+//         if (read_bin(inpFp, cmpBuf, cmpBytes) != cmpBytes) break;
 
-            // Add and wraparound the ringbuffer offset
-            decOffset += decBytes;
-            if ((size_t)decOffset >= ringBufferBytes - messageMaxBytes) decOffset = 0;
-        }
-    }
+//         {
+//             char* const decPtr = &decBuf[decOffset];
+//             const int decBytes = LZ4_decompress_safe_continue(
+//                 lz4StreamDecode, cmpBuf, decPtr, cmpBytes, (int) messageMaxBytes);
+//             if (decBytes <= 0) break;
+//             write_bin(outFp, decPtr, decBytes);
 
-    fclose(inpFp);
-    fclose(outFp);
-    free(decBuf);
-    free(cmpBuf);
-    LZ4_freeStreamDecode(lz4StreamDecode);
-}
+//             // Add and wraparound the ringbuffer offset
+//             decOffset += decBytes;
+//             if ((size_t)decOffset >= ringBufferBytes - messageMaxBytes) decOffset = 0;
+//         }
+//     }
+
+//     fclose(inpFp);
+//     fclose(outFp);
+//     free(decBuf);
+//     free(cmpBuf);
+//     LZ4_freeStreamDecode(lz4StreamDecode);
+ }
 
 /* Delta Endoded Array */
 
