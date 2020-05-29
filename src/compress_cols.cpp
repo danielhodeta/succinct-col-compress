@@ -371,10 +371,6 @@ struct DataWithIndexStruct {
     int index;
 };
 
-struct RDXData {
-    int index;
-};
-
 template<typename T>
 static DataWithIndexStruct<T> * MergeSort (DataWithIndexStruct<T> *data_array, u_int64_t size) {
 
@@ -434,49 +430,17 @@ int CompressCols::DeltaEAEncode() {
 
     }
     file_in.close();
-
-    //Setting Up Patricia Trie
-    const int MAX_RDX_NODES = line_num_+1; //How many keys do you need
-    const int NUM_KEYS = 1;
-    const int MAX_KEY_BYTES = 4;            //Should actually be 8?
-
-    auto to_byte_array {
-        [&](int n) -> unsigned char* {
-            unsigned char * bytes = new unsigned char[MAX_KEY_BYTES+1];
-            bytes[0] = 1;
-            for (int i=0; i<MAX_KEY_BYTES; i++) {
-                bytes[i+1] = (n >> 8*(MAX_KEY_BYTES-i-1)) & 0xFF;
-            }
-            return bytes;
-        }
-    };
-
-    auto *rdx = new MultiKeyRdxPat::MKRdxPat<RDXData>(MAX_RDX_NODES, NUM_KEYS, MAX_KEY_BYTES);
-    
     
     //Sort
     DataWithIndexStruct<T>* sorted_data = MergeSort<T>(data_array_with_index, line_num_);
     delete[] data_array_with_index;
     T* data_array = new T[line_num_];
+    int *index_data = new int[line_num_];
     for (int i=0; i<line_num_; i++) {
         data_array[i] = sorted_data[i].data_point;
-
-        RDXData *index_data = new RDXData;
-        index_data->index=sorted_data[i].index;
-        unsigned char *key = to_byte_array(i);
-        
-        int return_code = rdx->insert((unsigned char *)key, &index_data);
-
-        if (return_code) {
-            std::cerr<<"DeltaEAEncode(): patricia is dying, error "<<return_code<<"!\n";
-            exit(1);
-        }
-        delete[] key;
-        //std::cout<<"checl\n";
-        //delete index_data;
+        index_data[i] = sorted_data[i].index;
     }
     delete[] sorted_data;
-    delete rdx;
 
     
 
@@ -598,6 +562,7 @@ int CompressCols::DeltaEAEncode() {
     metadata.close();
 
     delete[] data_array;
+    delete[] index_data;
     return 1;
 }
 
