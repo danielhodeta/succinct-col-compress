@@ -13,15 +13,31 @@ set(APACHE_SOURCE_DIR "${APACHE_PREFIX}/apache-cpp")
 set(APACHE_BIN_DIR "${APACHE_PREFIX}/build")
 set(APACHE_INSTALL_DIR "${APACHE_PREFIX}/install")
 
-#Apache Library Name
-set(APACHE_STATIC_LIB_NAME "${CMAKE_STATIC_LIBRARY_PREFIX}apache")
-set(APACHE_FULL_LIBRARY_NAME "${APACHE_STATIC_LIB_NAME}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+#Apache Library Names
+set(ARROW_STATIC_LIB_NAME "${CMAKE_STATIC_LIBRARY_PREFIX}arrow")
+set(ARROW_FULL_LIBRARY_NAME "${ARROW_STATIC_LIB_NAME}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+set(PARQUET_STATIC_LIB_NAME "${CMAKE_STATIC_LIBRARY_PREFIX}parquet")
+set(PARQUET_FULL_LIBRARY_NAME "${PARQUET_STATIC_LIB_NAME}${CMAKE_STATIC_LIBRARY_SUFFIX}")
 
-set(APACHE_CMAKE_ARGS "-DCMAKE_INSTALL_PREFIX=${APACHE_INSTALL_DIR}")
+set(APACHE_CMAKE_ARGS "-Wno-dev"
+                      "-DCMAKE_INSTALL_PREFIX=${APACHE_INSTALL_DIR}"
+                      "-DARROW_PARQUET=ON"                  #parquet
+                #       "-DPARQUET_BUILD_EXAMPLES=ON"
+                #       "-DARROW_WITH_BZ2=ON"                 #compression schemes
+                #       "-DARROW_WITH_ZLIB=ON"
+                #       "-DARROW_WITH_LZ4=ON"
+                #       "-DARROW_WITH_SNAPPY=ON"
+                #       "-DARROW_WITH_ZSTD=ON"
+                      #"-DARROW_DEPENDENCY_SOURCE=BUNDLED"
+                      #"-DARROW_S3=ON"                       #amazon s3
+                      #"-DARROW_FILESYSTEM=ON"               #file system api
+                      )
+
 
 #Set Include Directory and Library
-set(APACHE_INCLUDE_DIR "${APACHE_INSTALL_DIR}/include/arrow/")
-set(APACHE_LIBRARY "${APACHE_INSTALL_DIR}/lib/${APACHE_FULL_LIBRARY_NAME}")
+set(APACHE_INCLUDE_DIR "${APACHE_INSTALL_DIR}/include/")
+set(ARROW_LIBRARY "${APACHE_INSTALL_DIR}/lib/${ARROW_FULL_LIBRARY_NAME}")
+set(PARQUET_LIBRARY "${APACHE_INSTALL_DIR}/lib/${PARQUET_FULL_LIBRARY_NAME}")
 
 ExternalProject_Add(apache-cpp
         GIT_REPOSITORY "https://github.com/apache/arrow.git"
