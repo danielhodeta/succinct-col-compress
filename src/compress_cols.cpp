@@ -5,10 +5,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+
 #include "succinct_file.h"
 #include "lz4frame.h"
 #include "compress_cols.h"
 #include "delta_encoded_array.h"
+
+#include "arrow/io/file.h" //For Apache
+#include "parquet/stream_writer.h" 
+
+
 #include <sys/stat.h>
 #include <sys/time.h>
 
@@ -723,4 +729,39 @@ void CompressCols::DeltaEADecode() {
 
     decoded.close();
 
+}
+
+/*
+ * Apache
+ */ 
+
+void CompressCols::ApacheWriteFile() {
+
+    std::shared_ptr<arrow::io::FileOutputStream> outfile;
+
+   PARQUET_ASSIGN_OR_THROW(
+      outfile,
+      arrow::io::FileOutputStream::Open("test.parquet"));
+
+//    parquet::WriterProperties::Builder builder;
+//    std::shared_ptr<parquet::schema::GroupNode> schema;
+
+   // Set up builder with required compression type etc.
+   // Define schema.
+   // ...
+
+//    parquet::StreamWriter os{
+//       parquet::ParquetFileWriter::Open(outfile, schema, builder.build())};
+
+   // Loop over some data structure which provides the required
+   // fields to be written and write each row.
+//    for (const auto& a : getArticles())
+//    {
+//       os << a.name() << a.price() << a.quantity() << parquet::EndRow;
+//    }
+
+    
+
+
+    // u_int32_t number;
 }
