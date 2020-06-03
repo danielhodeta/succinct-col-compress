@@ -18,11 +18,17 @@ set(ARROW_STATIC_LIB_NAME "${CMAKE_STATIC_LIBRARY_PREFIX}arrow")
 set(ARROW_FULL_LIBRARY_NAME "${ARROW_STATIC_LIB_NAME}${CMAKE_STATIC_LIBRARY_SUFFIX}")
 set(PARQUET_STATIC_LIB_NAME "${CMAKE_STATIC_LIBRARY_PREFIX}parquet")
 set(PARQUET_FULL_LIBRARY_NAME "${PARQUET_STATIC_LIB_NAME}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+set(DATASET_FULL_LIBRARY_NAME "libarrow_dataset.a")
 
 set(APACHE_CMAKE_ARGS "-Wno-dev"
                       "-DCMAKE_INSTALL_PREFIX=${APACHE_INSTALL_DIR}"
-                      "-DARROW_PARQUET=ON"                  #parquet
-                #       "-DPARQUET_BUILD_EXAMPLES=ON"
+                      "-DARROW_PARQUET=ON"                    #parquet
+                      "-DPARQUET_BUILD_EXAMPLES=ON"
+                      "-DARROW_BUILD_EXAMPLES=ON"
+                      #"-DARROW_DATASET=ON"
+                      "-DARROW_FILESYSTEM=ON"
+                      "-DARROW_DEPENDENCY_SOURCE=BUNDLED"
+                      #"-DARROW_IPC=ON"
                 #       "-DARROW_WITH_BZ2=ON"                 #compression schemes
                 #       "-DARROW_WITH_ZLIB=ON"
                 #       "-DARROW_WITH_LZ4=ON"
@@ -38,6 +44,7 @@ set(APACHE_CMAKE_ARGS "-Wno-dev"
 set(APACHE_INCLUDE_DIR "${APACHE_INSTALL_DIR}/include/")
 set(ARROW_LIBRARY "${APACHE_INSTALL_DIR}/lib/${ARROW_FULL_LIBRARY_NAME}")
 set(PARQUET_LIBRARY "${APACHE_INSTALL_DIR}/lib/${PARQUET_FULL_LIBRARY_NAME}")
+set(DATASET_LIBRARY "${APACHE_INSTALL_DIR}/lib/${DATASET_FULL_LIBRARY_NAME}")
 
 ExternalProject_Add(apache-cpp
         GIT_REPOSITORY "https://github.com/apache/arrow.git"
