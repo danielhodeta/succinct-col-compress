@@ -554,10 +554,10 @@ int CompressCols::DeltaEAEncode() {
         [&] {
             for (int i=0; i<len; i++) uncompressed<<data_array[offset+i]<<"\n";
 
-            //if (!last_unenc) {
+            if (!last_unenc) {
                 metadata<<offset<<" "<<2<<" "<<uncompressed_count<<"\n";
                 last_unenc = 1;
-            //}
+            }
 
             uncompressed_count+=len;
             len=1;
