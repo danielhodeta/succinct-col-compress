@@ -486,13 +486,16 @@ int CompressCols::DeltaEAEncode() {
     // data_array = sorted_data;
 
 
-    std::ofstream metadata (delta_fp+"metadata", std::ofstream::out);
+    std::ofstream metadata_offset (delta_fp+"metadata-offset");
+    std::ofstream metadata_type_filei (delta_fp+"metadata-type_filei", std::ofstream::out);
     std::ofstream dea (delta_fp+this->split_file_name_+".dea");
     std::ofstream run (delta_fp+this->split_file_name_+".run");
     std::ofstream uncompressed (delta_fp+this->split_file_name_+".unc");
 
+
     //Metadata
     u_int64_t offset = 0;
+    std::vector<u_int64_t> offset_vector;
     //int type = 0;                               //0 => dea, 1= run, 2=uncompressed
     u_int64_t len = 1;
     //u_int64_t index = 0;
@@ -528,7 +531,8 @@ int CompressCols::DeltaEAEncode() {
             bitmap::EliasGammaDeltaEncodedArray<T> enc_array(data_array+offset, len);               //Encoding array
             enc_array.Serialize(dea);                                                               //Serializing array
 
-            metadata<<offset<<" "<<0<<" "<<dea_count<<"\n";
+            offset_vector.push_back(offset);
+            metadata_type_filei<<0<<" "<<dea_count<<"\n";
 
             dea_count++;
             sorted = 0;
@@ -541,7 +545,9 @@ int CompressCols::DeltaEAEncode() {
         [&] {
 
             run<<data_array[offset]<<"\n";
-            metadata<<offset<<" "<<1<<" "<<run_count<<"\n";
+            
+            offset_vector.push_back(offset);
+            metadata_type_filei<<1<<" "<<run_count<<"\n";
 
             len = 1;
             run_count++;
@@ -555,7 +561,8 @@ int CompressCols::DeltaEAEncode() {
             for (int i=0; i<len; i++) uncompressed<<data_array[offset+i]<<"\n";
 
             if (!last_unenc) {
-                metadata<<offset<<" "<<2<<" "<<uncompressed_count<<"\n";
+                offset_vector.push_back(offset);
+                metadata_type_filei<<2<<" "<<uncompressed_count<<"\n";
                 last_unenc = 1;
             }
 
@@ -613,10 +620,19 @@ int CompressCols::DeltaEAEncode() {
     // metadata<<std::to_string(this->line_num_)<<"\n";                                 //Sentry
     // metadata<<"-1";
 
+    if (offset_vector.size()>1) {
+        bitmap::EliasGammaDeltaEncodedArray<u_int64_t> offsets (offset_vector.data(), offset_vector.size()); 
+        offsets.Serialize(metadata_offset);
+    } else { 
+        metadata_offset<<offset_vector[0]<<"\n";
+    }
+
+
     uncompressed.close();
     run.close();
     dea.close();
-    metadata.close();
+    metadata_offset.close();
+    metadata_type_filei.close();
 
     delete[] data_array;
     return 1;
