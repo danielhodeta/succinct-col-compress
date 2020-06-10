@@ -480,10 +480,10 @@ int CompressCols::DeltaEAEncode() {
     }
     file_in.close();
 
-    //Sort
-    T* sorted_data = MergeSort<T>(data_array, line_num_);
-    delete[] data_array;
-    data_array = sorted_data;
+    // //Sort
+    // T* sorted_data = MergeSort<T>(data_array, line_num_);
+    // delete[] data_array;
+    // data_array = sorted_data;
 
 
     std::ofstream metadata (delta_fp+"metadata", std::ofstream::out);
@@ -497,23 +497,27 @@ int CompressCols::DeltaEAEncode() {
     u_int64_t len = 1;
     //u_int64_t index = 0;
 
-    //Counters
-    u_int64_t dea_count = 0;
+    //Counters - will serve as position markers within the files
+    u_int64_t dea_count = 0;                        
     u_int64_t run_count = 0;
     u_int64_t uncompressed_count = 0;                                     
 
-    int run_threshold =5;
+    int run_threshold =14000000;
 
     //States
     bool sorted = 0;
     bool in_run = 0;
+    bool unenc = 0;
+    bool last_unenc = 0;                                                                    //Checks if the last run is unencoded
 
     auto ini_type {
         [&](int i) {
             if (i<line_num_-1 && data_array[i] < data_array[i+1]) {
                 sorted = 1;
-            } else {                                                //sorted so > can be ignored
+            } else if (i<line_num_-1 && data_array[i] == data_array[i+1]) {                                                
                 in_run = 1;
+            } else {
+                unenc = 1;
             }
             offset = i;
         }
@@ -528,6 +532,7 @@ int CompressCols::DeltaEAEncode() {
 
             dea_count++;
             sorted = 0;
+            last_unenc = 0;
             len = 1;
         }
     };
@@ -540,7 +545,8 @@ int CompressCols::DeltaEAEncode() {
 
             len = 1;
             run_count++;
-            in_run=0;  
+            in_run = 0;
+            last_unenc = 0;  
         }
     };
 
@@ -548,49 +554,58 @@ int CompressCols::DeltaEAEncode() {
         [&] {
             for (int i=0; i<len; i++) uncompressed<<data_array[offset+i]<<"\n";
 
-            metadata<<offset<<" "<<2<<" "<<uncompressed_count<<"\n";
+            //if (!last_unenc) {
+                metadata<<offset<<" "<<2<<" "<<uncompressed_count<<"\n";
+                last_unenc = 1;
+            //}
 
             uncompressed_count+=len;
             len=1;
             sorted=0;
+
         }
     };
+    ini_type(0);
+    for (u_int64_t i=1; i<line_num_; i++) {
 
-    for (u_int64_t i=0; i<line_num_; i++) {
-        if (i==0) {
-            ini_type(i);
-        } else {
-            assert(in_run!=sorted);
+        int comp;
+        if (data_array[i-1] < data_array[i]) comp = 1;
+        else if (data_array[i-1] == data_array[i]) comp = 0;
+        else comp = -1;
 
-            int comp;
-            if (data_array[i-1] < data_array[i]) comp = 1;
-            else comp = 0;
-
-            if (in_run) {
-                if (!comp) {
-                    len++;
-                } else {
-                    run_end();
-                    ini_type(i);
-                }
+        if (in_run) {
+            if (comp == 0) {
+                len++;
             } else {
-                if (comp) {
-                    len++;
-                } else {
-                    if (len<run_threshold) unc_end();
-                    else dea_end();
-
-                    ini_type(i);
-                }
+                run_end();
+                ini_type(i);
             }
+        } else if (sorted) {
+            if (comp == 1) {
+                len++;
+            } else {
+                if (len<run_threshold) unc_end();
+                else dea_end();
 
-            if (i==line_num_-1) {
-                if (in_run) {
-                    run_end();
-                } else {
-                    if (len<run_threshold) unc_end();
-                    else dea_end();
-                } 
+                ini_type(i);
+            }
+        } else {
+            if (comp == -1) {
+                len++;
+            } else {
+                unc_end();
+                ini_type(i);
+            }
+        }
+
+        if (i==line_num_-1) {
+            if (in_run) {
+                run_end();
+            } else if (sorted) {
+                if (len<run_threshold) unc_end();
+                else dea_end();
+            } else {
+                unc_end();
             }
         }
     }
