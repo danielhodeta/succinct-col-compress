@@ -25,6 +25,7 @@ class CompressCols {
     template<typename T> int DeltaEAEncode();
     template<typename T> void DeltaEADecode();
     template<typename T> T DeltaEAIndexAt(u_int64_t index);
+    template<typename T> int DeaRleEncodeArray(T* data_array, std::string file_path, std::string file_name);
 
   public:
     static int Split(std::string file_path = ifile_path_, int total_col_num = total_col_num_);

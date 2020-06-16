@@ -462,34 +462,15 @@ static T* MergeSort (T* data_array, u_int64_t size) {
     }
 }
 
-//DEA_Encoding and Serialization
 template<typename T>
-int CompressCols::DeltaEAEncode() {
+int CompressCols::DeaRleEncodeArray(T* data_array, std::string file_path, std::string file_name) {
 
-    std::string delta_fp = "./out/"+this->split_file_name_+".dea/";
-    if(mkdir(delta_fp.c_str(), 0777) == -1) return 0;
+    if(mkdir(file_path.c_str(), 0777) == -1) return 0;
 
-    std::ifstream file_in (this->split_file_path_);                                                //Reading split file
-    std::string read_num;
-    T *data_array = new T[line_num_];                                   
-    for (uint64_t i=0; i<line_num_ && (file_in >> read_num); i++) {                           //Converting strings to T and storing in array
-
-        std::istringstream read_stream (read_num);
-        read_stream >> data_array[i];
-
-    }
-    file_in.close();
-
-    //Sort
-    T* sorted_data = MergeSort<T>(data_array, line_num_);
-    delete[] data_array;
-    data_array = sorted_data;
-
-
-    std::ofstream metadata (delta_fp+"metadata", std::ofstream::out);
-    std::ofstream dea (delta_fp+this->split_file_name_+".dea");
-    std::ofstream run (delta_fp+this->split_file_name_+".run");
-    std::ofstream uncompressed (delta_fp+this->split_file_name_+".unc");
+    std::ofstream metadata (file_path+"metadata", std::ofstream::out);
+    std::ofstream dea (file_path+file_name+".dea");
+    std::ofstream run (file_path+file_name+".run");
+    std::ofstream uncompressed (file_path+file_name+".unc");
 
     //Metadata
     u_int64_t offset = 0;
@@ -602,6 +583,35 @@ int CompressCols::DeltaEAEncode() {
     run.close();
     dea.close();
     metadata.close();
+
+    return 1;
+}
+
+//DEA_Encoding and Serialization
+template<typename T>
+int CompressCols::DeltaEAEncode() {
+
+    std::string delta_fp = "./out/"+this->split_file_name_+".dea/";
+    if(mkdir(delta_fp.c_str(), 0777) == -1) return 0;
+
+    std::ifstream file_in (this->split_file_path_);                                                //Reading split file
+    std::string read_num;
+    T *data_array = new T[line_num_];                                   
+    for (uint64_t i=0; i<line_num_ && (file_in >> read_num); i++) {                           //Converting strings to T and storing in array
+
+        std::istringstream read_stream (read_num);
+        read_stream >> data_array[i];
+
+    }
+    file_in.close();
+
+    //Sort
+    T* sorted_data = MergeSort<T>(data_array, line_num_);
+    delete[] data_array;
+    data_array = sorted_data;
+
+
+    if(!DeaRleEncodeArray<T>(data_array, delta_fp+"data_array/", this->split_file_name_)) return 0;
 
     delete[] data_array;
     return 1;
