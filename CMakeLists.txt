@@ -15,6 +15,7 @@ set (CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 include(LZ4External)
 include(DSLibExternal)
 include(SuccinctExternal)
+include(SuRF)
 #include(FindSuccinct)
 
 #add subdirectories
