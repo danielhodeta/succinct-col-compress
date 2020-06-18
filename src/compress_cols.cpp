@@ -12,6 +12,8 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 
+#include "FST.hpp"
+
 //Static Variable Definition
 
 bool CompressCols::split_ = false;
@@ -422,40 +424,48 @@ int CompressCols::LZ4Compress() {
 /* Delta Endoded Array */
 
 template<typename T>
-static T* MergeSort (T* data_array, u_int64_t size) {
+struct DataWithIndexStruct {
+    T data_point;
+    int index;
+};
+
+template<typename T>
+static DataWithIndexStruct<T> * MergeSort (DataWithIndexStruct<T> *data_array, u_int64_t size) {
 
     if (size == 1) {
-        return data_array;
+        DataWithIndexStruct<T>* arr = new DataWithIndexStruct<T>[1];
+        arr[0] = data_array[0];
+        return arr;
     } else if (size == 2) {
-
-        if (data_array[0] > data_array[1]) {
-            T temp = data_array[1];
-            data_array[1] = data_array[0];
-            data_array[0] = temp;
+        DataWithIndexStruct<T>* arr = new DataWithIndexStruct<T>[2];
+        if (data_array[0].data_point > data_array[1].data_point) {
+            arr[1] = data_array[0]; arr[0] = data_array[1];
+        } else {
+            arr[1] = data_array[1]; arr[0] = data_array[0];
         }
-        return data_array;
+        return arr;
     } else {
         u_int64_t midpoint = (size - 1)/2; //left = 0-mid (mid+1)  right = mid+1 - size-1 (size-1-mid)
-        T* left = MergeSort(data_array, midpoint+1);
-        T* right = MergeSort(data_array+(midpoint+1), size-(midpoint+1));
+        DataWithIndexStruct<T>* left = MergeSort(data_array, midpoint+1);
+        DataWithIndexStruct<T>* right = MergeSort(data_array+(midpoint+1), size-(midpoint+1));
 
         u_int64_t l=0; 
         u_int64_t r=0;
 
-        T* sorted = new T[size];
+        DataWithIndexStruct<T> *sorted = new DataWithIndexStruct<T>[size];
 
         for (u_int64_t i=0; i<size; i++) {
             if (r >= size-midpoint-1) {sorted[i] = left[l++]; continue;}
             if (l >= midpoint+1) {sorted[i] = right[r++]; continue;}
 
-            if (left[l] < right[r]) sorted[i] = left[l++];
+            if (left[l].data_point < right[r].data_point) sorted[i] = left[l++];
             else sorted[i] = right[r++];
             
         }
-        if (midpoint+1 > 2) delete[] left;
-        if (size-(midpoint+1) > 2) delete[] right;
-        // delete[] left;
-        // delete[] right;
+        //if (midpoint+1 > 2) delete[] left;
+        //if (size-(midpoint+1) > 2) delete[] right;
+        delete[] left;
+        delete[] right;
         assert(r+l == size);
         return sorted;
 
@@ -596,24 +606,49 @@ int CompressCols::DeltaEAEncode() {
 
     std::ifstream file_in (this->split_file_path_);                                                //Reading split file
     std::string read_num;
-    T *data_array = new T[line_num_];                                   
+
+    T* unsorted_data = new T[line_num_];
+    DataWithIndexStruct<T> *data_array_with_index = new DataWithIndexStruct<T>[line_num_];                                   
     for (uint64_t i=0; i<line_num_ && (file_in >> read_num); i++) {                           //Converting strings to T and storing in array
 
         std::istringstream read_stream (read_num);
-        read_stream >> data_array[i];
+        read_stream >> data_array_with_index[i].data_point;
+        unsorted_data[i] = data_array_with_index[i].data_point;
+        data_array_with_index[i].index = i;
 
     }
+    
     file_in.close();
 
+    //Random access encode
+    if(!DeaRleEncodeArray<T>(unsorted_data, delta_fp+"unsorted_data_arr/", this->split_file_name_)) return 0;
+    delete[] unsorted_data;
+
     //Sort
-    T* sorted_data = MergeSort<T>(data_array, line_num_);
+    DataWithIndexStruct<T>* sorted_data = MergeSort<T>(data_array_with_index, line_num_);
+    delete[] data_array_with_index;
+    T* data_array = new T[line_num_];
+    std::vector<u_int64_t> index_vector;
+    for (int i=0; i<line_num_; i++) {
+        data_array[i] = sorted_data[i].data_point;
+        index_vector.push_back(sorted_data[i].index);
+    }
+
+    //Dea Encode data_array
+    //if(!DeaRleEncodeArray<T>(data_array, delta_fp+"sorted_data_array/", this->split_file_name_)) return 0;
+
+    //Convert it into array for FST
+    std::vector<T> data_vector;
+    for (int i = 0; i<line_num_; i++) {
+        data_vector.push_back(data_array[i]);
+    }
     delete[] data_array;
-    data_array = sorted_data;
+    
+    FST *new_fst = new FST;
+    new_fst->load(data_vector, index_vector);
 
-
-    if(!DeaRleEncodeArray<T>(data_array, delta_fp+"data_array/", this->split_file_name_)) return 0;
-
-    delete[] data_array;
+    std::cout<<new_fst->mem()<<"\n";
+    
     return 1;
 }
 
