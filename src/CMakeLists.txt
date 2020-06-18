@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.10)
 include_directories("${SUCCINCT_INCLUDE_DIR}" 
                     "${LZ4_INCLUDE_DIR}" 
                     "${DSLIB_INCLUDE_DIR}" 
-                    "${SURF_INCLUDE_DIR}"
+                    "${FST_INCLUDE_DIR}"
                     "./include")
 
 #create executable
@@ -15,4 +15,6 @@ add_dependencies(col_compress succinct-cpp)
 target_link_libraries(col_compress 
                     "${SUCCINCT_LIBRARY}" 
                     "${LZ4_LIBRARY}"
+                    "${FST_LIBRARY}" 
                     pthread)
+
