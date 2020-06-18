@@ -477,34 +477,47 @@ int CompressCols::DeaRleEncodeArray(T* data_array, std::string file_path, std::s
 
     if(mkdir(file_path.c_str(), 0777) == -1) return 0;
 
-    std::ofstream metadata (file_path+"metadata", std::ofstream::out);
+    std::ofstream metadata_offset (file_path+"metadata-offset");
+    std::ofstream metadata_type_filei (file_path+"metadata-type_filei", std::ofstream::out);
     std::ofstream dea (file_path+file_name+".dea");
-    std::ofstream run (file_path+file_name+".run");
+
+    //std::ofstream run (file_path+file_name+".run");
+    std::vector<T> run_vector;
+    FILE *run;
+    std::string run_file_name = file_path+file_name+".run";
+    run = fopen(run_file_name.c_str(), "a");
+
     std::ofstream uncompressed (file_path+file_name+".unc");
 
     //Metadata
     u_int64_t offset = 0;
+    std::vector<u_int64_t> offset_vector;
     //int type = 0;                               //0 => dea, 1= run, 2=uncompressed
     u_int64_t len = 1;
     //u_int64_t index = 0;
 
-    //Counters
+    //Counters - will serve as position markers within the files
     u_int64_t dea_count = 0;
     u_int64_t run_count = 0;
-    u_int64_t uncompressed_count = 0;                                     
+    u_int64_t uncompressed_count = 0;
+                                         
 
     int run_threshold =5;
 
     //States
     bool sorted = 0;
     bool in_run = 0;
+    bool unenc = 0;
+    bool last_unenc = 0; 
 
     auto ini_type {
         [&](int i) {
             if (i<line_num_-1 && data_array[i] < data_array[i+1]) {
                 sorted = 1;
-            } else {                                                //sorted so > can be ignored
+            } else if (i<line_num_-1 && data_array[i] == data_array[i+1]) {                                                
                 in_run = 1;
+            } else {
+                unenc = 1;
             }
             offset = i;
         }
@@ -515,10 +528,12 @@ int CompressCols::DeaRleEncodeArray(T* data_array, std::string file_path, std::s
             bitmap::EliasGammaDeltaEncodedArray<T> enc_array(data_array+offset, len);               //Encoding array
             enc_array.Serialize(dea);                                                               //Serializing array
 
-            metadata<<offset<<" "<<0<<" "<<dea_count<<"\n";
+            offset_vector.push_back(offset);
+            metadata_type_filei<<0<<" "<<dea_count<<"\n";
 
             dea_count++;
             sorted = 0;
+            last_unenc = 0;
             len = 1;
         }
     };
@@ -526,12 +541,17 @@ int CompressCols::DeaRleEncodeArray(T* data_array, std::string file_path, std::s
     auto run_end {
         [&] {
 
-            run<<data_array[offset]<<"\n";
-            metadata<<offset<<" "<<1<<" "<<run_count<<"\n";
+            //run<<data_array[offset]<<"\n";
+            run_vector.push_back(data_array[offset]);
+
+            offset_vector.push_back(offset);
+            metadata_type_filei<<1<<" "<<run_count<<"\n";
+
 
             len = 1;
             run_count++;
             in_run=0;  
+            last_unenc = 0; 
         }
     };
 
@@ -539,7 +559,11 @@ int CompressCols::DeaRleEncodeArray(T* data_array, std::string file_path, std::s
         [&] {
             for (int i=0; i<len; i++) uncompressed<<data_array[offset+i]<<"\n";
 
-            metadata<<offset<<" "<<2<<" "<<uncompressed_count<<"\n";
+            if (!last_unenc) {
+                offset_vector.push_back(offset);
+                metadata_type_filei<<2<<" "<<uncompressed_count<<"\n";
+                last_unenc = 1;
+            }
 
             uncompressed_count+=len;
             len=1;
@@ -547,52 +571,69 @@ int CompressCols::DeaRleEncodeArray(T* data_array, std::string file_path, std::s
         }
     };
 
-    for (u_int64_t i=0; i<line_num_; i++) {
-        if (i==0) {
-            ini_type(i);
-        } else {
-            assert(in_run!=sorted);
+    ini_type(0);
+    for (u_int64_t i=1; i<line_num_; i++) {
 
-            int comp;
-            if (data_array[i-1] < data_array[i]) comp = 1;
-            else comp = 0;
+        int comp;
+        if (data_array[i-1] < data_array[i]) comp = 1;
+        else if (data_array[i-1] == data_array[i]) comp = 0;
+        else comp = -1;
 
-            if (in_run) {
-                if (!comp) {
-                    len++;
-                } else {
-                    run_end();
-                    ini_type(i);
-                }
+        if (in_run) {
+            if (comp == 0) {
+                len++;
             } else {
-                if (comp) {
-                    len++;
-                } else {
-                    if (len<run_threshold) unc_end();
-                    else dea_end();
-
-                    ini_type(i);
-                }
+                run_end();
+                ini_type(i);
             }
+        } else if (sorted) {
+            if (comp == 1) {
+                len++;
+            } else {
+                if (len<run_threshold) unc_end();
+                else dea_end();
 
-            if (i==line_num_-1) {
-                if (in_run) {
-                    run_end();
-                } else {
-                    if (len<run_threshold) unc_end();
-                    else dea_end();
-                } 
+                ini_type(i);
+            }
+        } else {
+            if (comp == -1) {
+                len++;
+            } else {
+                unc_end();
+                ini_type(i);
+            }
+        }
+
+        if (i==line_num_-1) {
+            if (in_run) {
+                run_end();
+            } else if (sorted) {
+                if (len<run_threshold) unc_end();
+                else dea_end();
+            } else {
+                unc_end();
             }
         }
     }
-        
+    
+    if (offset_vector.size()>1) {
+        bitmap::EliasGammaDeltaEncodedArray<u_int64_t> offsets (offset_vector.data(), offset_vector.size()); 
+        offsets.Serialize(metadata_offset);
+    } else { 
+        metadata_offset<<offset_vector[0]<<"\n";
+    }
+
     // metadata<<std::to_string(this->line_num_)<<"\n";                                 //Sentry
     // metadata<<"-1";
 
     uncompressed.close();
-    run.close();
+    
+    fwrite(run_vector.data(), sizeof(T), run_vector.size(), run);
+    fclose(run);
+
     dea.close();
-    metadata.close();
+    metadata_offset.close();
+    metadata_type_filei.close();
 
     return 1;
 }
