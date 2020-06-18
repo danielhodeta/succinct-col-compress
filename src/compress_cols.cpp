@@ -679,20 +679,21 @@ int CompressCols::DeltaEAEncode() {
         index_vector.push_back(sorted_data[i].index);
     }
 
-    //Dea Encode data_array
-    //if(!DeaRleEncodeArray<T>(data_array, delta_fp+"sorted_data_array/", this->split_file_name_)) return 0;
+    //Sorted DEA Encode
+    if(!DeaRleEncodeArray<T>(data_array, delta_fp+"sorted_data_array/", this->split_file_name_)) return 0;
+    if(!DeaRleEncodeArray<T>(index_vector.data(), delta_fp+"rq_index/", "indices")) return 0;
 
-    //Convert it into array for FST
-    std::vector<T> data_vector;
-    for (int i = 0; i<line_num_; i++) {
-        data_vector.push_back(data_array[i]);
-    }
+    // //Convert it into array for FST
+    // std::vector<T> data_vector;
+    // for (int i = 0; i<line_num_; i++) {
+    //     data_vector.push_back(data_array[i]);
+    // }
     delete[] data_array;
     
-    FST *new_fst = new FST;
-    new_fst->load(data_vector, index_vector);
+    // FST *new_fst = new FST;
+    // new_fst->load(data_vector, index_vector);
 
-    std::cout<<new_fst->mem()<<"\n";
+    // std::cout<<new_fst->mem()<<"\n";
     
     return 1;
 }
