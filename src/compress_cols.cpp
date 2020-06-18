@@ -484,10 +484,12 @@ int CompressCols::DeaRleEncodeArray(T* data_array, std::string file_path, std::s
     //std::ofstream run (file_path+file_name+".run");
     std::vector<T> run_vector;
     FILE *run;
-    std::string run_file_name = file_path+file_name+".run";
-    run = fopen(run_file_name.c_str(), "a");
+    run = fopen((file_path+file_name+".run").c_str(), "a");
 
-    std::ofstream uncompressed (file_path+file_name+".unc");
+    //std::ofstream uncompressed (file_path+file_name+".unc");
+    std::vector<T> unc_vector;
+    FILE *uncompressed;
+    uncompressed = fopen((file_path+file_name+".unc").c_str(), "a");
 
     //Metadata
     u_int64_t offset = 0;
@@ -557,7 +559,7 @@ int CompressCols::DeaRleEncodeArray(T* data_array, std::string file_path, std::s
 
     auto unc_end {
         [&] {
-            for (int i=0; i<len; i++) uncompressed<<data_array[offset+i]<<"\n";
+            for (int i=0; i<len; i++) unc_vector.push_back(data_array[offset+i]);
 
             if (!last_unenc) {
                 offset_vector.push_back(offset);
@@ -626,9 +628,11 @@ int CompressCols::DeaRleEncodeArray(T* data_array, std::string file_path, std::s
     // metadata<<std::to_string(this->line_num_)<<"\n";                                 //Sentry
     // metadata<<"-1";
 
-    uncompressed.close();
-    
+    //uncompressed.close();
+    fwrite(unc_vector.data(), sizeof(T), unc_vector.size(), uncompressed);
     fwrite(run_vector.data(), sizeof(T), run_vector.size(), run);
+
+    fclose(uncompressed);
     fclose(run);
 
     dea.close();
