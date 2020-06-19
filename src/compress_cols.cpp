@@ -673,7 +673,7 @@ int CompressCols::DeltaEAEncode() {
     DataWithIndexStruct<T>* sorted_data = MergeSort<T>(data_array_with_index, line_num_);
     delete[] data_array_with_index;
     T* data_array = new T[line_num_];
-    std::vector<u_int64_t> index_vector;
+    std::vector<u_int32_t> index_vector;
     for (int i=0; i<line_num_; i++) {
         data_array[i] = sorted_data[i].data_point;
         index_vector.push_back(sorted_data[i].index);
@@ -681,7 +681,7 @@ int CompressCols::DeltaEAEncode() {
 
     //Sorted DEA Encode
     if(!DeaRleEncodeArray<T>(data_array, delta_fp+"sorted_data_array/", this->split_file_name_)) return 0;
-    if(!DeaRleEncodeArray<T>(index_vector.data(), delta_fp+"rq_index/", "indices")) return 0;
+    if(!DeaRleEncodeArray<u_int32_t>(index_vector.data(), delta_fp+"rq_index/", "indices")) return 0;
 
     // //Convert it into array for FST
     // std::vector<T> data_vector;
