@@ -41,10 +41,12 @@ CompressCols::CompressCols(std::string file_path, int total_col_num, int col_num
 
     size_t index {file_path.find_last_of("/", file_path.length())};
     if (index == -1) {
-        this->split_file_name_ = file_path+"_col_"+std::to_string(col_num)+".txt";
+        if (col_num==12) this->split_file_name_ = file_path+"_col_"+std::to_string(col_num)+".txt";
+        else this->split_file_name_ = file_path+"_col_"+std::to_string(col_num);
         this->split_file_path_ = "./out/"+this->split_file_name_;
     } else {
-        this->split_file_name_ = file_path.substr(index+1, file_path.length())+"_col_"+std::to_string(col_num)+".txt";
+        if (col_num==12) this->split_file_name_ = file_path.substr(index+1, file_path.length())+"_col_"+std::to_string(col_num)+".txt";
+        else this->split_file_name_ = file_path.substr(index+1, file_path.length())+"_col_"+std::to_string(col_num);
         this->split_file_path_ = "./out/"+this->split_file_name_; 
     }
     
@@ -95,8 +97,9 @@ int CompressCols::Compress(std::string scheme) {
         case 'd':
             if (this->scheme_!="dea") break;
 
-            start = get_timestamp(); 
-            return_val = this->DeltaEAEncode<u_int64_t>();
+            start = get_timestamp();
+            if (col_num_==2||col_num_==3||col_num_==8||col_num_==9||col_num_==11) return_val = this->DeltaEAEncode<u_int32_t>();
+            else return_val = this->DeltaEAEncode<u_int64_t>();
             total_time = get_timestamp() - start;
 
             if (return_val) {
@@ -133,7 +136,8 @@ int CompressCols::Decompress() {
             break;
         case 'd':
             if (this->scheme_!="dea") break;
-            this->DeltaEADecode<u_int64_t>();
+            if (col_num_==2||col_num_==3||col_num_==8||col_num_==9||col_num_==11) this->DeltaEADecode<u_int32_t>();
+            else this->DeltaEADecode<u_int64_t>();
             return_val = 1;
             break;
         default:
@@ -158,15 +162,24 @@ int CompressCols::Split(std::string file_path, int total_col_num) {
         split_file_path_prefix = "./out/"+file_path.substr(index+1, file_path.length())+"_col_"; 
     }
 
-    std::vector<std::ofstream*> split_file_output_streams;
-    split_file_output_streams.reserve(total_col_num);
+
+    std::vector<std::vector<u_int64_t>> int64_cols;
+    int64_cols.reserve(total_col_num);
+    std::vector<std::vector<u_int32_t>> int32_cols;
+    int32_cols.reserve(total_col_num);
+
+    std::vector<FILE *> file_ptr_vector;
     
-    for (int i=0; i<total_col_num; i++) {
-        std::string file_path = split_file_path_prefix+std::to_string(i+1)+".txt";
-        std::ofstream *file_stream = new std::ofstream(file_path, std::ofstream::trunc);
-        split_file_output_streams.push_back(file_stream);
+    for (int i=0; i<total_col_num && i!=11; i++) {
+        std::string file_path = split_file_path_prefix+std::to_string(i+1);
+        FILE *fptr = fopen(file_path.c_str(), "a");
+        file_ptr_vector.push_back(fptr);
     }
     
+    std::ofstream col12_stream; 
+    col12_stream.open(split_file_path_prefix+"12.txt", std::ofstream::trunc);
+
+
 
     FILE *fptr = fopen(file_path.c_str(), "r");
     
@@ -201,7 +214,21 @@ int CompressCols::Split(std::string file_path, int total_col_num) {
                                             line_read.find(' '));
             }
             if(i<=total_col_num) {                                            //Write to file
-                *split_file_output_streams[i] << cell_data << '\n';              
+                
+                if(i==11) {
+                    col12_stream << cell_data << '\n';
+                } else if (i==1||i==2||i==7||i==8||i==10) {
+                    std::stringstream s_stream (cell_data);
+                    u_int32_t cast_num;
+                    s_stream >> cast_num;
+                    int32_cols[i].push_back(cast_num);
+                } else {
+                    std::stringstream s_stream (cell_data);
+                    u_int64_t cast_num;
+                    s_stream >> cast_num;
+                    int64_cols[i].push_back(cast_num);
+                }
+
             }
 
             line_read = line_read.substr(line_read.find(' ')+1, 
@@ -215,12 +242,18 @@ int CompressCols::Split(std::string file_path, int total_col_num) {
     }
     free(buffer);
     line_num_ = line_count;
+
     
-    for (int i=0; i<total_col_num; i++) {
-        (*split_file_output_streams[i]).close();
-        delete split_file_output_streams[i];
+    for (int i=0; i<total_col_num && i!=11; i++) {
+        if (i==1||i==2||i==7||i==8||i==10) {
+            fwrite(int32_cols[i].data(), sizeof(u_int32_t), int32_cols[i].size(), file_ptr_vector[i]);
+        } else {
+            fwrite(int64_cols[i].data(), sizeof(u_int64_t), int64_cols[i].size(), file_ptr_vector[i]);
+        }
+        fclose(file_ptr_vector[i]);
     }
     fclose(fptr);
+    col12_stream.close();
     split_ = true;
 
     timestamp_t total_time = get_timestamp() - start;
@@ -649,30 +682,40 @@ int CompressCols::DeltaEAEncode() {
     std::string delta_fp = "./out/"+this->split_file_name_+".dea/";
     if(mkdir(delta_fp.c_str(), 0777) == -1) return 0;
 
-    std::ifstream file_in (this->split_file_path_);                                                //Reading split file
-    std::string read_num;
+    //std::ifstream file_in (this->split_file_path_);                                                //Reading split file
+    FILE *file_in = fopen(this->split_file_path_.c_str(), "r");
+    //std::string read_num;
 
     T* unsorted_data = new T[line_num_];
-    DataWithIndexStruct<T> *data_array_with_index = new DataWithIndexStruct<T>[line_num_];                                   
-    for (uint64_t i=0; i<line_num_ && (file_in >> read_num); i++) {                           //Converting strings to T and storing in array
+    DataWithIndexStruct<T> *data_array_with_index = new DataWithIndexStruct<T>[line_num_];
 
-        std::istringstream read_stream (read_num);
-        read_stream >> data_array_with_index[i].data_point;
-        unsorted_data[i] = data_array_with_index[i].data_point;
+    fread(unsorted_data, sizeof(T), line_num_, file_in);
+    for (int i=0; i<line_num_; i++) {
+        data_array_with_index[i].data_point = unsorted_data[i];
         data_array_with_index[i].index = i;
-
     }
+
+    // for (uint64_t i=0; i<line_num_ && (file_in >> read_num); i++) {                           //Converting strings to T and storing in array
+
+    //     // std::istringstream read_stream (read_num);
+    //     // read_stream >> data_array_with_index[i].data_point;
+    //     // unsorted_data[i] = data_array_with_index[i].data_point;
+    //     // data_array_with_index[i].index = i;
+
+
+
+    // }
     
-    file_in.close();
+    //file_in.close();
+    fclose(file_in);
 
     //Random access encode
     if(!DeaRleEncodeArray<T>(unsorted_data, delta_fp+"unsorted_data_arr/", this->split_file_name_)) return 0;
     delete[] unsorted_data;
-
     //Sort
     DataWithIndexStruct<T>* sorted_data = MergeSort<T>(data_array_with_index, line_num_);
     delete[] data_array_with_index;
-    std::vector<T> data_vector;
+    std::vector<u_int64_t> data_vector;
     std::vector<u_int64_t> index_vector;
     for (int i=0; i<line_num_; i++) {
         data_vector.push_back(sorted_data[i].data_point);
