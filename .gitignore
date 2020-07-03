@@ -31,4 +31,10 @@ external/*
 #tests
 tests/*
 
+#FST
+fst/build/
+fst/src/
+fst/stamp/
+fst/tmp/
+
 *.o

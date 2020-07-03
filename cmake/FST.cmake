@@ -7,9 +7,9 @@
 include(ExternalProject)
 
 #FST Directories
-set(FST_PREFIX "${PROJECT_SOURCE_DIR}/external/FST-prefix")
+set(FST_PREFIX "${PROJECT_SOURCE_DIR}/fst")
 set(FST_HOME "${FST_PREFIX}")
-set(FST_SOURCE_DIR "${FST_PREFIX}/FST")
+set(FST_SOURCE_DIR "${FST_PREFIX}/fast-succinct-trie")
 set(FST_BIN_DIR "${FST_PREFIX}/build")
 
 #FST Library Name
@@ -22,10 +22,11 @@ set(FST_LIBRARY "${FST_BIN_DIR}/fst/src/${FST_FULL_LIBRARY_NAME}")
 
 ExternalProject_Add(fast-succinct-trie
         GIT_REPOSITORY "https://github.com/efficient/fast-succinct-trie.git"
-        #DOWNLOAD_COMMAND ""
-        #UPDATE_COMMAND ""
+        DOWNLOAD_COMMAND ""
+        UPDATE_COMMAND ""
         #CONFIGURE_COMMAND ""
         #BUILD_COMMAND ""
+        BUILD_ALWAYS ON
         PREFIX "${FST_PREFIX}"
         SOURCE_DIR "${FST_SOURCE_DIR}"
         BINARY_DIR "${FST_BIN_DIR}"

@@ -20,3 +20,4 @@ include(FST)
 
 #add subdirectories
 add_subdirectory(src)
+#add_subdirectory(tests)
