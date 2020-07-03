@@ -735,7 +735,7 @@ int CompressCols::DeltaEAEncode() {
     if (col_num_ > 3 && col_num_ < 8) {
         std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
-        if(!new_fst->lookup(data_vector[0], value)) return 0;
+        if(!new_fst->lookup(data_vector[line_num_/2], value)) return 0;
 
         std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 
@@ -751,7 +751,7 @@ int CompressCols::DeltaEAEncode() {
 
         std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
-        if(!new_fst->lowerBound(data_vector[0], iter)) return 0;
+        if(!new_fst->lowerBound(data_vector[line_num_/2], iter)) return 0;
 
         std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 
