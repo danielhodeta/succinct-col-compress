@@ -11,6 +11,7 @@
 #include "delta_encoded_array.h"
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <chrono>
 
 #include "FST.hpp"
 
@@ -727,8 +728,37 @@ int CompressCols::DeltaEAEncode() {
     
     FST *new_fst = new FST;
     new_fst->load(data_vector, index_vector);
+    u_int64_t* value;
 
     std::cout<<new_fst->mem()<<"\n";
+
+    if (col_num_ > 3 && col_num_ < 8) {
+        std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+
+        if(!new_fst->lookup(data_vector[0], value)) return 0;
+
+        std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+
+        long double time_span = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
+
+        std::cout<<"Time taken for single key lookup for column "<<col_num_<<": "<<time_span<<" nanoseconds.\n";
+    }
+
+    value = nullptr;
+    FSTIter iter(new_fst);
+
+    if (col_num_ > 3 && col_num_ < 8) {
+
+        std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+
+        if(!new_fst->lowerBound(data_vector[0], iter)) return 0;
+
+        std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+
+        long double time_span = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
+
+        std::cout<<"Time taken for range query for column "<<col_num_<<": "<<time_span<<" nanoseconds.\n";
+    }
     
     return 1;
 }
@@ -753,6 +783,12 @@ static int64_t BinarySearch (std::vector<u_int64_t> offset, u_int64_t index) {
     }
     return -1;
 } 
+
+auto CompressCols::DeltaEAKeyLookup(u_int64_t key) {
+
+    return 0;
+}
+
 
 //DEA Deserialization
 template<typename T>

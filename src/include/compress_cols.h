@@ -32,6 +32,7 @@ class CompressCols {
     CompressCols(std::string file_path, int total_col_num=12, int col_num = 1, bool limit_flag = false);
     int Compress(std::string scheme = "succinct");
     int Decompress();
+    auto DeltaEAKeyLookup(u_int64_t key);
 
 };
 
