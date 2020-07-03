@@ -12,7 +12,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 
-#include "FST.hpp"
+//#include "FST.hpp"
 
 //Static Variable Definition
 
@@ -672,15 +672,15 @@ int CompressCols::DeltaEAEncode() {
     //Sort
     DataWithIndexStruct<T>* sorted_data = MergeSort<T>(data_array_with_index, line_num_);
     delete[] data_array_with_index;
-    T* data_array = new T[line_num_];
+    std::vector<T> data_vector;
     std::vector<u_int32_t> index_vector;
     for (int i=0; i<line_num_; i++) {
-        data_array[i] = sorted_data[i].data_point;
+        data_vector.push_back(sorted_data[i].data_point);
         index_vector.push_back(sorted_data[i].index);
     }
 
     //Sorted DEA Encode
-    if(!DeaRleEncodeArray<T>(data_array, delta_fp+"sorted_data_array/", this->split_file_name_)) return 0;
+    if(!DeaRleEncodeArray<T>(data_vector.data(), delta_fp+"sorted_data_array/", this->split_file_name_)) return 0;
     if(!DeaRleEncodeArray<u_int32_t>(index_vector.data(), delta_fp+"rq_index/", "indices")) return 0;
 
     // //Convert it into array for FST
@@ -688,7 +688,7 @@ int CompressCols::DeltaEAEncode() {
     // for (int i = 0; i<line_num_; i++) {
     //     data_vector.push_back(data_array[i]);
     // }
-    delete[] data_array;
+    //delete[] data_array;
     
     // FST *new_fst = new FST;
     // new_fst->load(data_vector, index_vector);
