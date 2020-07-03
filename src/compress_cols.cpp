@@ -11,6 +11,7 @@
 #include "delta_encoded_array.h"
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <chrono>
 
 //#include "FST.hpp"
 
@@ -674,6 +675,26 @@ int CompressCols::DeaRleEncodeArray(T* data_array, std::string file_path, std::s
 
     return 1;
 }
+template<typename T>
+static int BinarySearch (std::vector<T> sorted_array, T key, std::vector<u_int32_t>& index) {
+    u_int64_t l_bound = 0;
+    u_int64_t r_bound = sorted_array.size()-1;
+    u_int64_t midpoint;
+
+    while (l_bound<=r_bound) {
+        midpoint = l_bound + ((r_bound - l_bound)/2);
+        if (sorted_array[midpoint]<key) {l_bound = midpoint + 1;}
+        else if (sorted_array[midpoint]>key) {r_bound = midpoint -1;}
+        else {
+            index.push_back(midpoint);
+            for (int i=1; midpoint-i>= 0 && sorted_array[midpoint-i]==key; i++) index.push_back(midpoint-i);
+            for (int i=1; midpoint+i<= sorted_array.size()-1 && sorted_array[midpoint+i]==key; i++) index.push_back(midpoint+i);
+            return 1;
+        }
+    }
+    return 0;
+} 
+
 
 //DEA_Encoding and Serialization
 template<typename T>
@@ -726,6 +747,39 @@ int CompressCols::DeltaEAEncode() {
     if(!DeaRleEncodeArray<T>(data_vector.data(), delta_fp+"sorted_data_array/", this->split_file_name_)) return 0;
     if(!DeaRleEncodeArray<u_int32_t>(index_vector.data(), delta_fp+"rq_index/", "indices")) return 0;
 
+    std::vector<u_int32_t> index1;
+    std::vector<u_int32_t> val1;
+
+    if (col_num_ > 3 && col_num_ < 8) {
+        std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+
+        if(!BinarySearch<T>(data_vector, data_vector[line_num_/2], val1)) return 0;
+        for (int i=0; i<val1.size();i++) {
+            index1.push_back(index_vector[val1[i]]);
+        }
+
+        
+        std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+
+        long double time_span = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
+
+        std::cout<<"Time taken for single key lookup for column "<<col_num_<<": "<<time_span<<" nanoseconds.\n";
+    }
+
+    // if (col_num_ > 3 && col_num_ < 8) {
+    //     std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+
+    //     if(!BinarySearch<T>(data_vector, data_vector[line_num_/2], index1)) return 0;
+
+    //     if(!BinarySearch<T>(data_vector, data_vector[(line_num_/2+2)%line_num_], index2)) return 0;
+
+    //     std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+
+    //     long double time_span = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
+
+    //     std::cout<<"Time taken for range query for column "<<col_num_<<": "<<time_span<<" nanoseconds.\n";
+    // }
+
     // //Convert it into array for FST
     // std::vector<T> data_vector;
     // for (int i = 0; i<line_num_; i++) {
@@ -760,7 +814,7 @@ static int64_t BinarySearch (std::vector<u_int64_t> offset, u_int64_t index) {
         }
     }
     return -1;
-} 
+}
 
 //DEA Deserialization
 template<typename T>
