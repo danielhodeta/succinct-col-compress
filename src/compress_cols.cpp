@@ -247,9 +247,11 @@ int CompressCols::Split(std::string file_path, int total_col_num) {
     
     for (int i=0; i<total_col_num && i!=11; i++) {
         if (i==1||i==2||i==7||i==8||i==10) {
-            fwrite(int32_cols[i].data(), sizeof(u_int32_t), int32_cols[i].size(), file_ptr_vector[i]);
+            size_t write_n = fwrite(int32_cols[i].data(), sizeof(u_int32_t), int32_cols[i].size(), file_ptr_vector[i]);
+            assert(write_n == int32_cols[i].size());
         } else {
-            fwrite(int64_cols[i].data(), sizeof(u_int64_t), int64_cols[i].size(), file_ptr_vector[i]);
+            size_t write_n = fwrite(int64_cols[i].data(), sizeof(u_int64_t), int64_cols[i].size(), file_ptr_vector[i]);
+            assert(write_n == int64_cols[i].size());
         }
         fclose(file_ptr_vector[i]);
     }
@@ -513,21 +515,21 @@ int CompressCols::DeaRleEncodeArray(T* data_array, std::string file_path, std::s
 
     std::ofstream metadata_offset (file_path+"metadata-offset");
     std::ofstream metadata_type_filei (file_path+"metadata-type_filei", std::ofstream::out);
-    std::ofstream dea (file_path+file_name+".dea");
+    std::ofstream dea (file_path+"dea");
 
     //std::ofstream run (file_path+file_name+".run");
     std::vector<T> run_vector;
     FILE *run;
-    run = fopen((file_path+file_name+".run").c_str(), "a");
+    run = fopen((file_path+"run").c_str(), "a");
 
     //std::ofstream uncompressed (file_path+file_name+".unc");
     std::vector<T> unc_vector;
     FILE *uncompressed;
-    uncompressed = fopen((file_path+file_name+".unc").c_str(), "a");
+    uncompressed = fopen((file_path+"unc").c_str(), "a");
 
     //Metadata
     u_int64_t offset = 0;
-    std::vector<u_int64_t> offset_vector;
+    std::vector<u_int32_t> offset_vector;
     //int type = 0;                               //0 => dea, 1= run, 2=uncompressed
     u_int64_t len = 1;
     //u_int64_t index = 0;
@@ -652,19 +654,29 @@ int CompressCols::DeaRleEncodeArray(T* data_array, std::string file_path, std::s
         }
     }
     
-    if (offset_vector.size()>1) {
-        bitmap::EliasGammaDeltaEncodedArray<u_int64_t> offsets (offset_vector.data(), offset_vector.size()); 
-        offsets.Serialize(metadata_offset);
-    } else { 
-        metadata_offset<<offset_vector[0]<<"\n";
-    }
+    // if (offset_vector.size()>1) {
+    //     bitmap::EliasGammaDeltaEncodedArray<u_int32_t> offsets (offset_vector.data(), offset_vector.size()); 
+    //     offsets.Serialize(metadata_offset);
+    // } else { 
+    //     metadata_offset<<offset_vector[0]<<"\n";
+    // }
+    offset_vector.push_back(offset_vector.back()+1);
+    bitmap::EliasGammaDeltaEncodedArray<u_int32_t> offsets (offset_vector.data(), offset_vector.size()); 
+    size_t serialized_size = offsets.Serialize(metadata_offset);
+    std::cout<<serialized_size<<"  <==== serialized size\n";
+    this->metadata_size_ = offset_vector.size()-1;
 
     // metadata<<std::to_string(this->line_num_)<<"\n";                                 //Sentry
     // metadata<<"-1";
 
     //uncompressed.close();
-    fwrite(unc_vector.data(), sizeof(T), unc_vector.size(), uncompressed);
-    fwrite(run_vector.data(), sizeof(T), run_vector.size(), run);
+    size_t write_amount = fwrite(unc_vector.data(), sizeof(T), unc_vector.size(), uncompressed);
+    assert(unc_vector.size()==write_amount);
+    this->unc_size_ = unc_vector.size();
+
+    write_amount = fwrite(run_vector.data(), sizeof(T), run_vector.size(), run);
+    assert(run_vector.size()==write_amount);
+    this->run_size_ = run_vector.size();
 
     fclose(uncompressed);
     fclose(run);
@@ -710,7 +722,8 @@ int CompressCols::DeltaEAEncode() {
     T* unsorted_data = new T[line_num_];
     DataWithIndexStruct<T> *data_array_with_index = new DataWithIndexStruct<T>[line_num_];
 
-    fread(unsorted_data, sizeof(T), line_num_, file_in);
+    size_t read_amount = fread(unsorted_data, sizeof(T), line_num_, file_in);
+    assert(read_amount == line_num_);
     for (int i=0; i<line_num_; i++) {
         data_array_with_index[i].data_point = unsorted_data[i];
         data_array_with_index[i].index = i;
@@ -731,7 +744,7 @@ int CompressCols::DeltaEAEncode() {
     fclose(file_in);
 
     //Random access encode
-    if(!DeaRleEncodeArray<T>(unsorted_data, delta_fp+"unsorted_data_arr/", this->split_file_name_)) return 0;
+    if(!DeaRleEncodeArray<T>(unsorted_data, delta_fp+"unsorted_data_array/", "unsorted_data")) return 0;
     delete[] unsorted_data;
     //Sort
     DataWithIndexStruct<T>* sorted_data = MergeSort<T>(data_array_with_index, line_num_);
@@ -744,8 +757,8 @@ int CompressCols::DeltaEAEncode() {
     }
 
     //Sorted DEA Encode
-    if(!DeaRleEncodeArray<T>(data_vector.data(), delta_fp+"sorted_data_array/", this->split_file_name_)) return 0;
-    if(!DeaRleEncodeArray<u_int32_t>(index_vector.data(), delta_fp+"rq_index/", "indices")) return 0;
+    if(!DeaRleEncodeArray<T>(data_vector.data(), delta_fp+"sorted_data_array/", "sorted_data")) return 0;
+    if(!DeaRleEncodeArray<u_int32_t>(index_vector.data(), delta_fp+"rq_indices_array/", "rq_indices")) return 0;
 
     std::vector<u_int32_t> index1;
     std::vector<u_int32_t> val1;
@@ -780,24 +793,13 @@ int CompressCols::DeltaEAEncode() {
     //     std::cout<<"Time taken for range query for column "<<col_num_<<": "<<time_span<<" nanoseconds.\n";
     // }
 
-    // //Convert it into array for FST
-    // std::vector<T> data_vector;
-    // for (int i = 0; i<line_num_; i++) {
-    //     data_vector.push_back(data_array[i]);
-    // }
-    //delete[] data_array;
-    
-    // FST *new_fst = new FST;
-    // new_fst->load(data_vector, index_vector);
-
-    // std::cout<<new_fst->mem()<<"\n";
     
     return 1;
 }
 
-static int64_t BinarySearch (std::vector<u_int64_t> offset, u_int64_t index) {
+int64_t BinarySearch (CompressCols *column, bitmap::EliasGammaDeltaEncodedArray<u_int32_t> offset, u_int32_t index) {
     u_int64_t l_bound = 0;
-    u_int64_t r_bound = offset.size()-1;
+    u_int64_t r_bound = (column->metadata_size_)-1;
     u_int64_t midpoint;
 
     if (index >= offset[l_bound] && index < offset[l_bound+1]) return l_bound;
@@ -818,83 +820,98 @@ static int64_t BinarySearch (std::vector<u_int64_t> offset, u_int64_t index) {
 
 //DEA Deserialization
 template<typename T>
-T CompressCols::DeltaEAIndexAt(u_int64_t index) {
+T CompressCols::DeltaEAIndexAt(int file_type, u_int32_t index) {
 
-    std::string delta_fp = "./out/"+this->split_file_name_+".dea/";
-      
+    std::string delta_fp;
+    switch (file_type) {
+        case 0:
+            delta_fp = "./out/"+this->split_file_name_+".dea/rq_indices_array/";
+            break;
+        case 1:
+            delta_fp = "./out/"+this->split_file_name_+".dea/sorted_data_array/";
+            break;
+        case 2:
+            delta_fp = "./out/"+this->split_file_name_+".dea/unsorted_data_array/";
+            break;
+        default:
+            std::cerr<<"deltaeaindexat: invalid type";
+            exit(1);
+    }
 
-    std::ifstream metadata (delta_fp+"metadata");
+    std::ifstream metadata (delta_fp+"metadata-type_filei");
 
     //Metadata
-    static std::vector<u_int64_t> offset {};
-    static std::vector<int> type {};
-    static std::vector<u_int16_t> index_in_file {};
+    std::ifstream metadata_offset (delta_fp+"metadata-offset");                             //ensure reading only once
+    bitmap::EliasGammaDeltaEncodedArray<u_int32_t> offsets (NULL, 0);
+    size_t deserialized_size = offsets.Deserialize(metadata_offset);
+    std::cout<<deserialized_size<<" <== deserialized size\n";
+    std::vector<int> type {};
+    std::vector<u_int64_t> index_in_file {};
 
     u_int64_t data;
-    if (offset.size()==0) {
+    if (type.size()==0) {  
+        
         while(metadata.peek()!=EOF) {
             metadata >> data;
-            offset.push_back(data);
-
-            metadata >> data;
+            
             type.push_back(data);
 
             metadata >> data;
-            index_in_file.push_back(data);
-            
+            index_in_file.push_back(data); 
         }
+        metadata_offset.close();
     }
-    assert((offset.size()-type.size()+index_in_file.size())==offset.size());               //making sure they're the same size()
+    metadata.close();  
     
-    if (offset[offset.size()-2] > offset[offset.size()-1]) {                            //Erase last entry if it's meaningless
-        offset.erase(offset.end()-1);
-        type.erase(type.end()-1);
-        index_in_file.erase(index_in_file.end()-1);
-    }   
+    
+    // if (offset[offset.size()-2] > offset[offset.size()-1]) {                            //Erase last entry if it's meaningless
+    //     offset.erase(offset.end()-1);
+    //     type.erase(type.end()-1);
+    //     index_in_file.erase(index_in_file.end()-1);
+    // }   
 
-    int64_t position = BinarySearch(offset, index);
+    int64_t position = BinarySearch(this, offsets, index);
     assert(position>=0);
 
-    static std::vector<bitmap::EliasGammaDeltaEncodedArray<T>*> dec_arrays {};
-    static std::vector<u_int64_t> runs {};
-    static std::vector<u_int64_t> unc_data {};
-
+    std::vector<bitmap::EliasGammaDeltaEncodedArray<T>*> dec_arrays {};
+    std::vector<u_int64_t> runs {};
+    std::vector<u_int64_t> unc_data {};
+    
     if (type[position]==0) {
         
-        if (dec_arrays.size()==0){
-            std::ifstream dea (delta_fp+this->split_file_name_+".dea");
+        //if (dec_arrays.size()==0){
+            std::ifstream dea (delta_fp+"dea");
             while (dea.peek()!=EOF) {
                 auto temp = new bitmap::EliasGammaDeltaEncodedArray<T>(NULL, 0);
                 (*temp).Deserialize(dea);
                 dec_arrays.push_back(temp);
             }
             dea.close();
-        }
-        return (*dec_arrays[index_in_file[position]])[index-offset[position]];
+        //}
+        return (*dec_arrays[index_in_file[position]])[index-offsets[position]];
 
     } else if (type[position]==1) {
-        if (runs.size()==0) {
-            std::ifstream run (delta_fp+this->split_file_name_+".run");
-            while (run.peek()!=EOF) {
-                u_int64_t temp;
-                run >> temp;
-                runs.push_back(temp);
-            }
-            run.close();
-        }
+        //if (runs.size()==0) {
+            //std::ifstream run (delta_fp+this->split_file_name_+".run");
+            FILE *run_file = fopen((delta_fp+"run").c_str(), "r");
+            T* run_data = new T[this->run_size_];
+            size_t read_amount = fread(run_data, sizeof(T), this->run_size_, run_file);
+            assert(read_amount == this->run_size_);
+            fclose(run_file);
+       // }
         return runs[index_in_file[position]];
 
     } else {
-        if (unc_data.size()==0) {
-            std::ifstream uncompressed (delta_fp+this->split_file_name_+".unc"); 
-            while (uncompressed.peek()!=EOF) {
-                u_int64_t temp;
-                uncompressed >> temp;
-                unc_data.push_back(temp);
-            }
-            uncompressed.close();
-        }
-        return unc_data[index_in_file[position]+index-offset[position]];
+        //if (unc_data.size()==0) {
+            FILE* unc_file = fopen ((delta_fp+"unc").c_str(), "r");
+            T* unc_data = new T[this->unc_size_];
+            size_t read_amount = fread(unc_data, sizeof(T), this->unc_size_, unc_file);
+            assert (read_amount == this->unc_size_);
+            fclose(unc_file);
+        //}
+        std::cout<<offsets[1]<<"\n";
+        std::cout<<position<<"\n";
+        return unc_data[index_in_file[position]+index-offsets[position]];
     }
 
 
@@ -904,10 +921,10 @@ T CompressCols::DeltaEAIndexAt(u_int64_t index) {
 template<typename T>
 void CompressCols::DeltaEADecode() {
 
-    std::string delta_fp = "./out/"+this->split_file_name_+".dea/";
+    //std::string delta_fp = "./out/"+this->split_file_name_+".dea/";
     std::ofstream decoded (this->split_file_path_+".dea_dec", std::ifstream::out);
     
-    for (int i=0; i<line_num_; i++) decoded<<this->DeltaEAIndexAt<u_int64_t>(i)<<"\n";
+    for (int i=0; i<1; i++) decoded<<this->DeltaEAIndexAt<u_int64_t>(2, i)<<"\n";
 
     decoded.close();
 

@@ -33,10 +33,10 @@ int main(int argc, char **argv) {
             
                 if(!cfile->Compress(scheme))
                     std::cout<<scheme + " compression unsuccessful for column "+std::to_string(i)+".\n";
-                // if(cfile->Decompress())
-                //     std::cout<<scheme + " decompression successful for column "+std::to_string(i)+".\n";
-                // else
-                //     std::cout<<scheme + " decompression unsuccessful for column "+std::to_string(i)+".\n";
+                if(cfile->Decompress())
+                    std::cout<<scheme + " decompression successful for column "+std::to_string(i)+".\n";
+                else
+                    std::cout<<scheme + " decompression unsuccessful for column "+std::to_string(i)+".\n";
 
         }
 

@@ -2,6 +2,7 @@
 #define COMPRESSCOL
 
 #include <stdio.h>
+#include "delta_encoded_array.h"
 
 class CompressCols {
     
@@ -15,6 +16,10 @@ class CompressCols {
     static u_int64_t line_num_;
     static int total_col_num_;
 
+    u_int32_t metadata_size_;
+    u_int32_t unc_size_;
+    u_int32_t run_size_;
+
     static bool split_;
     bool compressed_;
     static bool limit_flag_;
@@ -24,7 +29,7 @@ class CompressCols {
     void LZ4Decompress();
     template<typename T> int DeltaEAEncode();
     template<typename T> void DeltaEADecode();
-    template<typename T> T DeltaEAIndexAt(u_int64_t index);
+    template<typename T> T DeltaEAIndexAt(int file_type, u_int32_t index);
     template<typename T> int DeaRleEncodeArray(T* data_array, std::string file_path, std::string file_name);
 
   public:
@@ -32,6 +37,7 @@ class CompressCols {
     CompressCols(std::string file_path, int total_col_num=12, int col_num = 1, bool limit_flag = false);
     int Compress(std::string scheme = "succinct");
     int Decompress();
+    friend int64_t BinarySearch (CompressCols *column, bitmap::EliasGammaDeltaEncodedArray<u_int32_t> offset, u_int32_t index);
 
 };
 
