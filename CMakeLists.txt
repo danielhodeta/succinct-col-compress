@@ -11,6 +11,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
 #add module
 set (CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+
 #execute modules
 include(LZ4External)
 include(DSLibExternal)
