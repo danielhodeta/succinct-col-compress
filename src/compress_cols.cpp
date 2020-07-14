@@ -685,25 +685,6 @@ int CompressCols::DeaRleEncodeArray(T* data_array, std::string file_path, std::s
     metadata_type_filei.close();
 
     return 1;
-}
-template<typename T>
-static int BinarySearch (std::vector<T> sorted_array, T key, std::vector<u_int32_t>& index) {
-    u_int64_t l_bound = 0;
-    u_int64_t r_bound = sorted_array.size()-1;
-    u_int64_t midpoint;
-
-    while (l_bound<=r_bound) {
-        midpoint = l_bound + ((r_bound - l_bound)/2);
-        if (sorted_array[midpoint]<key) {l_bound = midpoint + 1;}
-        else if (sorted_array[midpoint]>key) {r_bound = midpoint -1;}
-        else {
-            index.push_back(midpoint);
-            for (int i=1; midpoint-i>= 0 && sorted_array[midpoint-i]==key; i++) index.push_back(midpoint-i);
-            for (int i=1; midpoint+i<= sorted_array.size()-1 && sorted_array[midpoint+i]==key; i++) index.push_back(midpoint+i);
-            return 1;
-        }
-    }
-    return 0;
 } 
 
 
@@ -728,18 +709,6 @@ int CompressCols::DeltaEAEncode() {
         data_array_with_index[i].index = i;
     }
 
-    // for (uint64_t i=0; i<line_num_ && (file_in >> read_num); i++) {                           //Converting strings to T and storing in array
-
-    //     // std::istringstream read_stream (read_num);
-    //     // read_stream >> data_array_with_index[i].data_point;
-    //     // unsorted_data[i] = data_array_with_index[i].data_point;
-    //     // data_array_with_index[i].index = i;
-
-
-
-    // }
-    
-    //file_in.close();
     fclose(file_in);
 
     //Random access encode
@@ -762,21 +731,21 @@ int CompressCols::DeltaEAEncode() {
     std::vector<u_int32_t> index1;
     std::vector<u_int32_t> val1;
 
-    if (col_num_ > 3 && col_num_ < 8) {
-        std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+    // if (col_num_ > 3 && col_num_ < 8) {
+    //     std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
-        if(!BinarySearch<T>(data_vector, data_vector[line_num_/2], val1)) return 0;
-        for (int i=0; i<val1.size();i++) {
-            index1.push_back(index_vector[val1[i]]);
-        }
+    //     if(!BinarySearch<T>(data_vector, data_vector[line_num_/2], val1)) return 0;
+    //     for (int i=0; i<val1.size();i++) {
+    //         index1.push_back(index_vector[val1[i]]);
+    //     }
 
         
-        std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+    //     std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 
-        long double time_span = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
+    //     long double time_span = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
 
-        std::cout<<"Time taken for single key lookup for column "<<col_num_<<": "<<time_span<<" nanoseconds.\n";
-    }
+    //     std::cout<<"Time taken for single key lookup for column "<<col_num_<<": "<<time_span<<" nanoseconds.\n";
+    // }
 
     // if (col_num_ > 3 && col_num_ < 8) {
     //     std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
@@ -860,21 +829,11 @@ T CompressCols::DeltaEAIndexAt(int file_type, u_int32_t index) {
         metadata_offset.close();
     }
     metadata.close();  
-    
-    
-    // // if (offset[offset.size()-2] > offset[offset.size()-1]) {                            //Erase last entry if it's meaningless
-    // //     offset.erase(offset.end()-1);
-    // //     type.erase(type.end()-1);
-    // //     index_in_file.erase(index_in_file.end()-1);
-    // // }   
+  
     int64_t position = BinarySearch(this->metadata_size_[file_type], offsets, index);
     assert(position>=0);
 
-
     std::vector<bitmap::EliasGammaDeltaEncodedArray<T>*> dec_arrays {};
-    // std::vector<u_int64_t> runs {};
-    // std::vector<u_int64_t> unc_data {};
-    
     if (type[position]==0) {
         
         //if (dec_arrays.size()==0){
@@ -890,7 +849,6 @@ T CompressCols::DeltaEAIndexAt(int file_type, u_int32_t index) {
 
     } else if (type[position]==1) {
         //if (runs.size()==0) {
-            //std::ifstream run (delta_fp+this->split_file_name_+".run");
             FILE *run_file = fopen((delta_fp+"run").c_str(), "r");
             T* run_data = new T[this->run_size_[file_type]];
             size_t read_amount = fread(run_data, sizeof(T), this->run_size_[file_type], run_file);
@@ -916,8 +874,6 @@ T CompressCols::DeltaEAIndexAt(int file_type, u_int32_t index) {
 template<typename T>
 void CompressCols::DeltaEADecode() {
 
-    //std::string delta_fp = "./out/"+this->split_file_name_+".dea/";
-    //std::ofstream decoded (this->split_file_path_+".dea_dec", std::ifstream::out);
     std::vector<T> decoded;
     for (int i=0; i<line_num_; i++) decoded.push_back(this->DeltaEAIndexAt<u_int32_t>(2, i));
 
@@ -925,6 +881,66 @@ void CompressCols::DeltaEADecode() {
     fwrite(decoded.data(), sizeof(T), decoded.size(), fptr);
     fclose(fptr);
 
-    //decoded.close();
+}
 
+template<typename T>
+int CompressCols::QueryBinarySearch (T key, u_int32_t& l_index, u_int32_t& u_index) {
+    u_int32_t l_bound = 0;
+    u_int32_t r_bound = line_num_-1;
+    u_int32_t midpoint;
+    bool flag = 0;
+    T val {0};
+
+    while (l_bound<=r_bound) {
+        midpoint = l_bound + ((r_bound - l_bound)/2);
+        val = this->DeltaEAIndexAt<T>(1, midpoint);
+        if (val==key && (midpoint==0 || this->DeltaEAIndexAt<T>(1, midpoint-1)!=key)) {
+            l_index = midpoint;
+            flag = 1;
+            break;
+        } else if (val<key) {
+            l_bound = midpoint + 1;
+        } else {
+            r_bound = midpoint -1;
+        }
+    }
+    if (!flag) return 0;
+
+    l_bound = midpoint;
+    r_bound = line_num_-1;
+    flag = 0;
+
+    while (l_bound<=r_bound) {
+        midpoint = l_bound + ((r_bound - l_bound)/2);
+        val = this->DeltaEAIndexAt<T>(1, midpoint);
+        if (val==key && (midpoint==line_num_-1 || this->DeltaEAIndexAt<T>(1, midpoint+1)!=key)) {
+            u_index = midpoint;
+            flag = 1;
+            break;
+        } else if (val>key) {
+            r_bound = midpoint -1;
+        } else {
+            l_bound = midpoint + 1;
+        }
+    }
+
+    return flag;
+}
+
+int CompressCols::SingleKeyLookup (u_int64_t key, std::vector<u_int32_t>& indices) {
+
+    u_int32_t l_index = -1;
+    u_int32_t u_index = -1;
+
+    if (col_num_==2||col_num_==3||col_num_==8||col_num_==9||col_num_==11) {
+        if(!this->QueryBinarySearch<u_int32_t>(key, l_index, u_index)) return 0;
+    } else {
+        if(!this->QueryBinarySearch<u_int64_t>(key, l_index, u_index)) return 0;
+    }
+    for (int i=l_index; i<u_index+1; i++) {
+        indices.push_back(this->DeltaEAIndexAt<u_int32_t>(2, i));
+    }
+
+    return 1;
+    
 }
