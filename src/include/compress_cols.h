@@ -39,6 +39,7 @@ class CompressCols {
     int Compress(std::string scheme = "succinct");
     int Decompress();
     int SingleKeyLookup (u_int64_t key, std::vector<u_int32_t>& indices);
+    friend void Benchmarking (CompressCols* c_file, std::vector<u_int64_t>& queries);
 
 };
 
