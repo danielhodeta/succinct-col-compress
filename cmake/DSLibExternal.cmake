@@ -21,6 +21,8 @@ ExternalProject_Add(ds-lib
         STAMP_DIR "${DSLIB_PREFIX}/stamp"
         BUILD_COMMAND ""
         INSTALL_COMMAND ""
+        DOWNLOAD_COMMAND ""
+        UPDATE_COMMAND ""
 
         LOG_DOWNLOAD ON)
 

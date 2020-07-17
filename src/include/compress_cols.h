@@ -4,6 +4,12 @@
 #include <stdio.h>
 #include "delta_encoded_array.h"
 
+struct Metadata {
+    std::vector<bitmap::EliasGammaDeltaEncodedArray<u_int32_t>*> offsets_vector;
+    std::vector<std::vector<int>> type;
+    std::vector<std::vector<u_int32_t>> index_in_file;
+};
+
 class CompressCols {
     
   private:
@@ -20,6 +26,8 @@ class CompressCols {
     std::vector<u_int32_t> unc_size_;
     std::vector<u_int32_t> run_size_;
 
+    Metadata* meta_data_;
+
     static bool split_;
     bool compressed_;
     static bool limit_flag_;
@@ -29,9 +37,15 @@ class CompressCols {
     void LZ4Decompress();
     template<typename T> int DeltaEAEncode();
     template<typename T> void DeltaEADecode();
-    template<typename T> T DeltaEAIndexAt(int file_type, u_int32_t index);
+    template<typename T> T DeltaEAIndexAt(int file_type, u_int32_t index,
+                                            bitmap::EliasGammaDeltaEncodedArray<T>** get_dec_array = nullptr,
+                                            T* get_run_data = nullptr,
+                                            T* get_unc_data = nullptr);
     template<typename T> int DeaRleEncodeArray(T* data_array, std::string file_path, std::string file_name);
     template<typename T> int QueryBinarySearch (T key, u_int32_t& l_index, u_int32_t& u_index);
+    Metadata* ReadMetadata(int file_type, std::string& delta_file_path);
+    int64_t TypeBinarySearch (u_int32_t metadata_size, bitmap::EliasGammaDeltaEncodedArray<u_int32_t>& offset, 
+                                            u_int64_t value); 
 
   public:
     static int Split(std::string file_path = ifile_path_, int total_col_num = total_col_num_);

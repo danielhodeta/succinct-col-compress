@@ -9,6 +9,7 @@
 #include <chrono>
 #include <sys/stat.h> 
 #include "compress_cols.h"
+#include "delta_encoded_array.h"
 
 void display_error(std::string msg) {
     std::cout<<"col_compress: "<<msg<<'\n';
@@ -46,6 +47,7 @@ int main(int argc, char **argv) {
         }
         cfiles[i-1] = cfile;
     }
+    
 
     int query_size = 1000;
     FILE *col_4_file = fopen ("./bench/queries/test_col_4", "r");
@@ -96,9 +98,10 @@ void Benchmarking (CompressCols* c_file, std::vector<u_int64_t>& queries) {
         std::vector<u_int32_t> indices;
         c_file->SingleKeyLookup(queries[i], indices);
     }
+    std::cerr<<"Warming up done\n";
 
     std::cerr<<"Measuring\n";
-     for (int i=0; i<queries.size(); i++) {
+    for (int i=0; i<queries.size(); i++) {
         std::vector<u_int32_t> indices;
         std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
         c_file->SingleKeyLookup(queries[i], indices);
