@@ -38,3 +38,6 @@ fst/stamp/
 fst/tmp/
 
 *.o
+
+#Bench
+bench
