@@ -804,7 +804,7 @@ Metadata* CompressCols::ReadMetadata(int file_type, std::string& delta_file_path
         
         size_t deserialized_size = (*meta_data->offsets_vector[file_type]).Deserialize(metadata_offset);
 
-        u_int32_t data;  
+        u_int32_t data; 
         while(metadata.peek()!=EOF) {
             metadata >> data;
             meta_data->type[file_type].push_back(data);
@@ -812,6 +812,7 @@ Metadata* CompressCols::ReadMetadata(int file_type, std::string& delta_file_path
             metadata >> data;
             meta_data->index_in_file[file_type].push_back(data); 
         }
+
         metadata_offset.close();
         metadata.close();
 
@@ -848,7 +849,8 @@ int64_t BinarySearch (u_int32_t metadata_size, bitmap::EliasGammaDeltaEncodedArr
 
 //DEA Deserialization
 template<typename T>
-T CompressCols::DeltaEAIndexAt(int file_type, u_int32_t index, 
+T CompressCols::DeltaEAIndexAt(int file_type, u_int32_t index,
+                                bool get_flag, 
                                 bitmap::EliasGammaDeltaEncodedArray<T>** get_dec_array,
                                 T* get_run_data,
                                 T* get_unc_data) {
@@ -884,8 +886,10 @@ T CompressCols::DeltaEAIndexAt(int file_type, u_int32_t index,
         // std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
         // long double time_span = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
         // std::cout<<time_span<<"\n";
-        if(get_dec_array) {
+        if(get_flag) {
             (*get_dec_array) = dec_arrays[file_type][meta_data->index_in_file[file_type][position]];
+            get_run_data = run_data[file_type];
+            get_unc_data = unc_data[file_type];
             return 0;
         }
         return (*dec_arrays[file_type][meta_data->index_in_file[file_type][position]])[index-(*meta_data->offsets_vector[file_type])[position]];
@@ -902,8 +906,10 @@ T CompressCols::DeltaEAIndexAt(int file_type, u_int32_t index,
         // std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
         // long double time_span = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
         // std::cout<<time_span<<"\n";
-        if (get_run_data) {
+        if (get_flag) {
+            (*get_dec_array) = dec_arrays[file_type][meta_data->index_in_file[file_type][position]];
             get_run_data = run_data[file_type];
+            get_unc_data = unc_data[file_type];
             return 0;
         }
         return run_data[file_type][meta_data->index_in_file[file_type][position]];
@@ -920,7 +926,9 @@ T CompressCols::DeltaEAIndexAt(int file_type, u_int32_t index,
         // std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
         // long double time_span = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
         // std::cout<<time_span<<"\n";
-        if (get_unc_data) {
+        if (get_flag) {
+            (*get_dec_array) = dec_arrays[file_type][meta_data->index_in_file[file_type][position]];
+            get_run_data = run_data[file_type];
             get_unc_data = unc_data[file_type];
             return 0;
         }
@@ -978,11 +986,10 @@ int CompressCols::QueryBinarySearch (T key, u_int32_t& l_index, u_int32_t& u_ind
     T* run_data;
     T* unc_data;
     bool flag = 0;
-    
-    DeltaEAIndexAt(1, 0, &dec_array, run_data, unc_data);
+    DeltaEAIndexAt(1, 0, true, &dec_array, run_data, unc_data);
     
     if (type == 0) {
-        l_index = dec_array->BinarySearch(key, meta_data->type[1][metadata_index+1]-meta_data->type[1][metadata_index]);
+        l_index = dec_array->BinarySearch(key, (*meta_data->offsets_vector[1])[metadata_index+1]-(*meta_data->offsets_vector[1])[metadata_index]);
         u_index = l_index + 1;
         flag = 1;
     } else if (type = 1) {

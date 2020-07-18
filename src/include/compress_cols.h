@@ -38,6 +38,7 @@ class CompressCols {
     template<typename T> int DeltaEAEncode();
     template<typename T> void DeltaEADecode();
     template<typename T> T DeltaEAIndexAt(int file_type, u_int32_t index,
+                                            bool get_flag = false,
                                             bitmap::EliasGammaDeltaEncodedArray<T>** get_dec_array = nullptr,
                                             T* get_run_data = nullptr,
                                             T* get_unc_data = nullptr);
