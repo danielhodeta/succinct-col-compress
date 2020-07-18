@@ -80,9 +80,9 @@ int main(int argc, char **argv) {
 
 
     Benchmarking(cfiles[3], col_4_queries);
-    Benchmarking(cfiles[4], col_5_queries);
-    Benchmarking(cfiles[5], col_6_queries);
-    Benchmarking(cfiles[6], col_7_queries);
+    // Benchmarking(cfiles[4], col_5_queries);
+    // Benchmarking(cfiles[5], col_6_queries);
+    // Benchmarking(cfiles[6], col_7_queries);
 
     return 0;
 }
@@ -102,7 +102,7 @@ void Benchmarking (CompressCols* c_file, std::vector<u_int64_t>& queries) {
     std::cerr<<"Warming up done\n";
 
     std::cerr<<"Measuring\n";
-    for (int i=0; i<queries.size(); i++) {
+    for (int i=0; i<1; i++) {
         std::vector<u_int32_t> indices;
         std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
         c_file->SingleKeyLookup(queries[i], indices);
