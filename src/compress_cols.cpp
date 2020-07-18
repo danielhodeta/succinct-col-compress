@@ -847,15 +847,19 @@ T CompressCols::DeltaEAIndexAt(int file_type, u_int32_t index) {
     assert(position>=0);
 
     static std::vector<std::vector<bitmap::EliasGammaDeltaEncodedArray<T>*>> dec_arrays {};
-    static T* run_data = new T[this->run_size_[file_type]];
-    static T* unc_data = new T[this->unc_size_[file_type]];
-    static std::vector<bool> run_unc_read_flags {false, false};
+    static std::vector<T*> run_data;
+    static std::vector<T*> unc_data;
+    static std::vector<std::vector<bool>> read_flags {{false, false, false},
+                                                      {false, false, false},
+                                                      {false, false, false}};
+    run_data.reserve(3);
+    unc_data.reserve(3);
 
     for (int i=0; i<3; i++) {
         dec_arrays.push_back(std::vector<bitmap::EliasGammaDeltaEncodedArray<T>*>());
     }
     if (type[file_type][position]==0) {
-        if (dec_arrays[file_type].size()==0){
+        if (!read_flags[file_type][0]){
             std::ifstream dea (delta_fp+"dea");
             while (dea.peek()!=EOF) {
                 auto temp = new bitmap::EliasGammaDeltaEncodedArray<T>(NULL, 0);
@@ -863,6 +867,7 @@ T CompressCols::DeltaEAIndexAt(int file_type, u_int32_t index) {
                 dec_arrays[file_type].push_back(temp);
             }
             dea.close();
+            read_flags[file_type][0] = true;
         }
         // std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
         // long double time_span = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
@@ -870,30 +875,32 @@ T CompressCols::DeltaEAIndexAt(int file_type, u_int32_t index) {
         return (*dec_arrays[file_type][index_in_file[file_type][position]])[index-(*offsets_vector[file_type])[position]];
 
     } else if (type[file_type][position]==1) {
-        if (!run_unc_read_flags[0]) {
+        if (!read_flags[file_type][1]) {
+            run_data[file_type] = new T[this->run_size_[file_type]];
             FILE *run_file = fopen((delta_fp+"run").c_str(), "r");
-            size_t read_amount = fread(run_data, sizeof(T), this->run_size_[file_type], run_file);
+            size_t read_amount = fread(run_data[file_type], sizeof(T), this->run_size_[file_type], run_file);
             assert(read_amount == this->run_size_[file_type]);
             fclose(run_file);
-            run_unc_read_flags[0] = true;
+            read_flags[file_type][1] = true;
         }
         // std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
         // long double time_span = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
         // std::cout<<time_span<<"\n";
-        return run_data[index_in_file[file_type][position]];
+        return run_data[file_type][index_in_file[file_type][position]];
 
     } else {
-        if (!run_unc_read_flags[1]) {
+        if (!read_flags[file_type][2]) {
+            unc_data[file_type] = new T[this->unc_size_[file_type]];
             FILE* unc_file = fopen ((delta_fp+"unc").c_str(), "r");
-            size_t read_amount = fread(unc_data, sizeof(T), this->unc_size_[file_type], unc_file);
+            size_t read_amount = fread(unc_data[file_type], sizeof(T), this->unc_size_[file_type], unc_file);
             assert (read_amount == this->unc_size_[file_type]);
             fclose(unc_file);
-            run_unc_read_flags[1] = true;
+             read_flags[file_type][2] = true;
         }
         // std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
         // long double time_span = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
         // std::cout<<time_span<<"\n";
-        return unc_data[index_in_file[file_type][position]+index-(*offsets_vector[file_type])[position]];
+        return unc_data[file_type][index_in_file[file_type][position]+index-(*offsets_vector[file_type])[position]];
     }
 
 }
