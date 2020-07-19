@@ -852,8 +852,8 @@ template<typename T>
 T CompressCols::DeltaEAIndexAt(int file_type, u_int32_t index,
                                 bool get_flag, 
                                 bitmap::EliasGammaDeltaEncodedArray<T>** get_dec_array,
-                                T* get_run_data,
-                                T* get_unc_data,
+                                T** get_run_data,
+                                T** get_unc_data,
                                 int64_t get_index,
                                 int get_type) {
     //std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
@@ -890,8 +890,8 @@ T CompressCols::DeltaEAIndexAt(int file_type, u_int32_t index,
         // std::cout<<time_span<<"\n";
         if(get_flag) {
             if (get_type==0)(*get_dec_array) = dec_arrays[file_type][meta_data->index_in_file[file_type][get_index]];
-            else if (get_type==1) get_run_data = run_data[file_type];
-            else if (get_type==2)get_unc_data = unc_data[file_type];
+            else if (get_type==1) (*get_run_data) = run_data[file_type];
+            else if (get_type==2)(*get_unc_data) = unc_data[file_type];
             return 0;
         }
         return (*dec_arrays[file_type][meta_data->index_in_file[file_type][position]])[index-(*meta_data->offsets_vector[file_type])[position]];
@@ -910,8 +910,8 @@ T CompressCols::DeltaEAIndexAt(int file_type, u_int32_t index,
         // std::cout<<time_span<<"\n";
         if (get_flag) {
             if (get_type==0)(*get_dec_array) = dec_arrays[file_type][meta_data->index_in_file[file_type][get_index]];
-            else if (get_type==1) get_run_data = run_data[file_type];
-            else if (get_type==2)get_unc_data = unc_data[file_type];
+            else if (get_type==1) (*get_run_data) = run_data[file_type];
+            else if (get_type==2)(*get_unc_data) = unc_data[file_type];
             return 0;
         }
         return run_data[file_type][meta_data->index_in_file[file_type][position]];
@@ -930,8 +930,8 @@ T CompressCols::DeltaEAIndexAt(int file_type, u_int32_t index,
         // std::cout<<time_span<<"\n";
         if (get_flag) {
             if (get_type==0)(*get_dec_array) = dec_arrays[file_type][meta_data->index_in_file[file_type][get_index]];
-            else if (get_type==1) get_run_data = run_data[file_type];
-            else if (get_type==2)get_unc_data = unc_data[file_type];
+            else if (get_type==1) (*get_run_data) = run_data[file_type];
+            else if (get_type==2)(*get_unc_data) = unc_data[file_type];
             return 0;
         }
         return unc_data[file_type][meta_data->index_in_file[file_type][position]+index-(*meta_data->offsets_vector[file_type])[position]];
@@ -962,13 +962,14 @@ int64_t CompressCols::TypeBinarySearch (u_int32_t metadata_size, bitmap::EliasGa
         midval = DeltaEAIndexAt<u_int64_t>(1, offset[midpoint]);
         if (value > midval) {
             if (midpoint == metadata_size-1) {return midpoint;}
-            else if (value <= DeltaEAIndexAt<u_int64_t>(1, offset[midpoint+1])) {return midpoint;}
+            else if (value < DeltaEAIndexAt<u_int64_t>(1, offset[midpoint+1])) {return midpoint;}
             else {l_bound = midpoint + 1; continue;}
         } else if (value < midval) {
             if (midpoint == 0) {return -1;}
             else {r_bound = midpoint -1; continue;}
         } else {
             if (midpoint == 0) {return midpoint;}
+            else if (value > DeltaEAIndexAt<u_int64_t>(1, offset[midpoint-1])) {return midpoint;}
             else {r_bound = midpoint -1; continue;}
         }
     }
@@ -988,11 +989,12 @@ int CompressCols::QueryBinarySearch (T key, u_int32_t& l_index, u_int32_t& u_ind
     T* run_data;
     T* unc_data;
     bool flag = 0;
-    DeltaEAIndexAt(1, 0, true, &dec_array, run_data, unc_data, metadata_index, type);
+    DeltaEAIndexAt(1, 0, true, &dec_array, &run_data, &unc_data, metadata_index, type);
     int num_elements = (*meta_data->offsets_vector[1])[metadata_index+1]-(*meta_data->offsets_vector[1])[metadata_index];
     if (type == 0) {
-        l_index = dec_array->BinarySearch(key, num_elements) + (*meta_data->offsets_vector[1])[metadata_index];
-        if (l_index == num_elements-1 && meta_data->type[1][metadata_index+1]==1) 
+        u_int32_t offset = (*meta_data->offsets_vector[1])[metadata_index];
+        l_index = dec_array->BinarySearch(key, num_elements) + offset;
+        if ((l_index - offset) == num_elements-1 && meta_data->type[1][metadata_index+1]==1) 
             u_index = (*meta_data->offsets_vector[1])[metadata_index+2]-1;
         else 
             u_index = l_index;
@@ -1019,7 +1021,8 @@ int CompressCols::QueryBinarySearch (T key, u_int32_t& l_index, u_int32_t& u_ind
                 r_bound = midpoint -1;
             }
         }
-        if (l_index == num_elements-1 && meta_data->type[1][metadata_index+1]==1)
+        u_int32_t offset = (*meta_data->offsets_vector[1])[metadata_index];
+        if ((l_index-offset) == num_elements-1 && meta_data->type[1][metadata_index+1]==1)
             u_index = (*meta_data->offsets_vector[1])[metadata_index+2]-1;
         else
             u_index = l_index;
