@@ -7,7 +7,6 @@
 
 rm -f -r ./out/*                                           #Clean output folder
 rm -f -r ./bench/bench_array_indices
-rm -f -r ./bench/bench_dea_indices
 
 schemes=("succinct" "lz4" "dea")
 TOTAL_COLS=$(head -n 1 $1 | wc -w) 
