@@ -97,15 +97,15 @@ void Benchmarking (CompressCols* c_file, std::vector<u_int64_t>& queries) {
     std::cerr<<"\nWarming up\n";
     for (int i=0; i<std::min(queries.size(), 100UL); i++) {
         std::vector<u_int32_t> indices;
-        c_file->SingleKeyLookup(queries[i], indices);
+        c_file->SingleKeyLookup(queries[i], &indices);
     }
     std::cerr<<"Warming up done\n";
 
     std::cerr<<"Measuring\n";
-    for (int i=0; i<1; i++) {
+    for (int i=0; i<queries.size(); i++) {
         std::vector<u_int32_t> indices;
         std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-        c_file->SingleKeyLookup(queries[i], indices);
+        c_file->SingleKeyLookup(queries[i], &indices);
         std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
         long double time_span = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
         results_stream<<time_span<<"\n";
