@@ -54,7 +54,7 @@ class CompressCols {
     CompressCols(std::string file_path, int total_col_num=12, int col_num = 1, bool limit_flag = false);
     int Compress(std::string scheme = "succinct");
     int Decompress();
-    int SingleKeyLookup (u_int64_t key, std::vector<u_int32_t>& indices);
+    int SingleKeyLookup (u_int64_t key, std::vector<u_int32_t>* indices);
     friend void Benchmarking (CompressCols* c_file, std::vector<u_int64_t>& queries);
 
 };

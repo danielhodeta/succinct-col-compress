@@ -1044,7 +1044,7 @@ int CompressCols::QueryBinarySearch (T key, u_int32_t& l_index, u_int32_t& u_ind
     return flag;
 }
 
-int CompressCols::SingleKeyLookup (u_int64_t key, std::vector<u_int32_t>& indices) {
+int CompressCols::SingleKeyLookup (u_int64_t key, std::vector<u_int32_t>* indices) {
 
     u_int32_t l_index = -1;
     u_int32_t u_index = -1;
@@ -1055,7 +1055,7 @@ int CompressCols::SingleKeyLookup (u_int64_t key, std::vector<u_int32_t>& indice
         if(!this->QueryBinarySearch<u_int64_t>(key, l_index, u_index)) return 0;
     }
     for (int i=l_index; i<u_index+1; i++) {
-        indices.push_back(this->DeltaEAIndexAt<u_int32_t>(2, i));
+        (*indices).push_back(this->DeltaEAIndexAt<u_int32_t>(2, i));
     } 
     
 
