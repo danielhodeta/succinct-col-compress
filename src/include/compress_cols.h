@@ -41,7 +41,8 @@ class CompressCols {
                                             bool get_flag = false,
                                             bitmap::EliasGammaDeltaEncodedArray<T>** get_dec_array = nullptr,
                                             T* get_run_data = nullptr,
-                                            T* get_unc_data = nullptr);
+                                            T* get_unc_data = nullptr,
+                                            int64_t get_index = -1);
     template<typename T> int DeaRleEncodeArray(T* data_array, std::string file_path, std::string file_name);
     template<typename T> int QueryBinarySearch (T key, u_int32_t& l_index, u_int32_t& u_index);
     Metadata* ReadMetadata(int file_type, std::string& delta_file_path);
