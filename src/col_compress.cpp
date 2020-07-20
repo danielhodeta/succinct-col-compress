@@ -78,9 +78,9 @@ int main(int argc, char **argv) {
 
 
     Benchmarking(cfiles[3], col_4_queries);
-    // Benchmarking(cfiles[4], col_5_queries);
-    // Benchmarking(cfiles[5], col_6_queries);
-    // Benchmarking(cfiles[6], col_7_queries);
+    Benchmarking(cfiles[4], col_5_queries);
+    Benchmarking(cfiles[5], col_6_queries);
+    Benchmarking(cfiles[6], col_7_queries);
 
     return 0;
 }
