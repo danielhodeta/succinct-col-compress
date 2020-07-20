@@ -994,11 +994,39 @@ int CompressCols::QueryBinarySearch (T key, u_int32_t& l_index, u_int32_t& u_ind
     if (type == 0) {
         u_int32_t offset = (*meta_data->offsets_vector[1])[metadata_index];
         l_index = dec_array->BinarySearch(key, num_elements) + offset;
-        
-        if ((l_index - offset) == num_elements-1 && meta_data->type[1][metadata_index+1]==1) 
-            u_index = (*meta_data->offsets_vector[1])[metadata_index+2]-1;
-        else 
-            u_index = l_index;
+
+        u_index = l_index;
+        if (metadata_index < metadata_size_[1] && (l_index - offset) == num_elements-1) {
+            bitmap::EliasGammaDeltaEncodedArray<T>* temp_dec_array;
+            T* temp_run_data;
+            T* temp_unc_data;
+            int next_type = meta_data->type[1][metadata_index+1];
+            DeltaEAIndexAt(1, 0, true, &temp_dec_array, &temp_run_data, &temp_unc_data, metadata_index+1, next_type);
+            int next_num_elements = (*meta_data->offsets_vector[1])[metadata_index+2]-(*meta_data->offsets_vector[1])[metadata_index+1];
+
+            if (next_type == 0 && temp_dec_array->Get(0)==key) {u_index++;}
+            else if (next_type == 1 && temp_run_data[meta_data->index_in_file[1][metadata_index+1]]==key) u_index+=next_num_elements;
+            else if (next_type == 2 ) {
+                u_int32_t start_i = meta_data->index_in_file[1][metadata_index+1];
+                u_int32_t delta_i = 0;
+                if (temp_unc_data[start_i+delta_i]==key) u_index++;
+            }
+        } else if (metadata_index > 0 && (l_index - offset) == 0) {
+            bitmap::EliasGammaDeltaEncodedArray<T>* temp_dec_array;
+            T* temp_run_data;
+            T* temp_unc_data;
+            int prev_type = meta_data->type[1][metadata_index-1];
+            DeltaEAIndexAt(1, 0, true, &temp_dec_array, &temp_run_data, &temp_unc_data, metadata_index-1, prev_type);
+            int prev_num_elements = (*meta_data->offsets_vector[1])[metadata_index]-(*meta_data->offsets_vector[1])[metadata_index-1];
+
+            if (prev_type == 0 && temp_dec_array->Get(prev_num_elements-1)==key) {l_index--;}
+            if (prev_type == 1 && temp_run_data[meta_data->index_in_file[1][metadata_index-1]]==key) {l_index-=prev_num_elements;}
+            else if (prev_type == 2 ) {
+                u_int32_t start_i = meta_data->index_in_file[1][metadata_index-1];
+                u_int32_t delta_i = (prev_num_elements-1);
+                if (temp_unc_data[start_i+delta_i]==key) l_index--;
+            }
+        }
         flag = 1;
     } else if (type == 1) {
         l_index = (*meta_data->offsets_vector[1])[metadata_index];
@@ -1018,9 +1046,11 @@ int CompressCols::QueryBinarySearch (T key, u_int32_t& l_index, u_int32_t& u_ind
                 if (temp_unc_data[start_i+delta_i]==key) l_index--;
             }
         }
-
         u_index = (*meta_data->offsets_vector[1])[metadata_index+1]-1;
-        
+        if(u_index == 41 || l_index == 41) {
+            int temp = DeltaEAIndexAt<T>(1, u_index-1);
+            std::cout<<"here\n";
+        }
         flag = 1;
     } else if (type == 2) {
         u_int32_t l_bound = 0;
@@ -1047,6 +1077,10 @@ int CompressCols::QueryBinarySearch (T key, u_int32_t& l_index, u_int32_t& u_ind
         // }
         u_index = l_index;
         for (int i=l_index+1; DeltaEAIndexAt<T>(1, i)==key; i++) u_index++;
+        if(u_index == 41 || l_index == 41) {
+            int temp = DeltaEAIndexAt<T>(1, u_index-1);
+            std::cout<<"here\n";
+        }
         // if (l_index < offset+num_elements-1) {
         //     for (int i=l_index; unc_data[i]==key && i<offset+num_elements-1; i++);
         //     u_index = l_index;
@@ -1097,8 +1131,8 @@ int CompressCols::SingleKeyLookup (u_int64_t key, std::vector<u_int32_t>* indice
         if(!this->QueryBinarySearch<u_int64_t>(key, l_index, u_index)) return 0;
     }
     for (int i=l_index; i<u_index+1; i++) {
-        //(*indices).push_back(this->DeltaEAIndexAt<u_int32_t>(2, i));
-        (*indices).push_back(i);
+        (*indices).push_back(this->DeltaEAIndexAt<u_int32_t>(2, i));
+        //(*indices).push_back(i);
     } 
     
 
