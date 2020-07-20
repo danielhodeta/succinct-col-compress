@@ -1027,6 +1027,7 @@ int CompressCols::QueryBinarySearch (T key, u_int32_t& l_index, u_int32_t& u_ind
         u_int32_t r_bound = line_num_-1;
         u_int32_t midpoint;
         T val {0};
+        u_int32_t temp_index = -1;
         while (l_bound<=r_bound) {
             midpoint = l_bound + ((r_bound - l_bound)/2);
             val = this->DeltaEAIndexAt<T>(1, midpoint);
@@ -1040,11 +1041,28 @@ int CompressCols::QueryBinarySearch (T key, u_int32_t& l_index, u_int32_t& u_ind
                 r_bound = midpoint -1;
             }
         }
-        u_int32_t offset = (*meta_data->offsets_vector[1])[metadata_index];
-        if ((l_index-offset) == num_elements-1 && meta_data->type[1][metadata_index+1]==1)
-            u_index = (*meta_data->offsets_vector[1])[metadata_index+2]-1;
-        else
-            u_index = l_index;
+        //u_int32_t offset = (*meta_data->offsets_vector[1])[metadata_index];
+        // if (key == 1049776942) {
+        //     std::cout<<"here\n";
+        // }
+        u_index = l_index;
+        for (int i=l_index+1; DeltaEAIndexAt<T>(1, i)==key; i++) u_index++;
+        // if (l_index < offset+num_elements-1) {
+        //     for (int i=l_index; unc_data[i]==key && i<offset+num_elements-1; i++);
+        //     u_index = l_index;
+        // } else {
+        //     bitmap::EliasGammaDeltaEncodedArray<T>* temp_dec_array;
+        //     T* temp_run_data;
+        //     T* temp_unc_data;
+        //     int next_type = meta_data->type[1][metadata_index+1];
+        //     DeltaEAIndexAt<T>(1, 0, true, &temp_dec_array, &temp_run_data, &temp_unc_data, metadata_index+1, next_type);
+        //     int next_num_elements = (*meta_data->offsets_vector[1])[metadata_index]-(*meta_data->offsets_vector[1])[metadata_index-1];
+
+        //     u_index = l_index;
+        //     if (next_type == 0 && (*temp_dec_array)[0] == key) u_index++;
+        //     if (next_type == 1 && temp_run_data[0] == key) u_index+=next_num_elements;
+        //     if (next_type == 2 && temp_unc_data[0] == key) u_index++;
+        // }
     }
     
     // if (!flag) return 0;
@@ -1079,8 +1097,8 @@ int CompressCols::SingleKeyLookup (u_int64_t key, std::vector<u_int32_t>* indice
         if(!this->QueryBinarySearch<u_int64_t>(key, l_index, u_index)) return 0;
     }
     for (int i=l_index; i<u_index+1; i++) {
-        (*indices).push_back(this->DeltaEAIndexAt<u_int32_t>(2, i));
-        //(*indices).push_back(i);
+        //(*indices).push_back(this->DeltaEAIndexAt<u_int32_t>(2, i));
+        (*indices).push_back(i);
     } 
     
 
