@@ -1047,10 +1047,6 @@ int CompressCols::QueryBinarySearch (T key, u_int32_t& l_index, u_int32_t& u_ind
             }
         }
         u_index = (*meta_data->offsets_vector[1])[metadata_index+1]-1;
-        if(u_index == 41 || l_index == 41) {
-            int temp = DeltaEAIndexAt<T>(1, u_index-1);
-            std::cout<<"here\n";
-        }
         flag = 1;
     } else if (type == 2) {
         u_int32_t l_bound = 0;
@@ -1077,10 +1073,6 @@ int CompressCols::QueryBinarySearch (T key, u_int32_t& l_index, u_int32_t& u_ind
         // }
         u_index = l_index;
         for (int i=l_index+1; DeltaEAIndexAt<T>(1, i)==key; i++) u_index++;
-        if(u_index == 41 || l_index == 41) {
-            int temp = DeltaEAIndexAt<T>(1, u_index-1);
-            std::cout<<"here\n";
-        }
         // if (l_index < offset+num_elements-1) {
         //     for (int i=l_index; unc_data[i]==key && i<offset+num_elements-1; i++);
         //     u_index = l_index;

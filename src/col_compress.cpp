@@ -79,10 +79,10 @@ int main(int argc, char **argv) {
     for(int i=0; i<query_size; i++) col_7_queries.push_back(col_7_q[i]);
 
 
-    Benchmarking(cfiles[3], col_4_queries);
-    Benchmarking(cfiles[4], col_5_queries);
-    Benchmarking(cfiles[5], col_6_queries);
-    Benchmarking(cfiles[6], col_7_queries);
+    //Benchmarking(cfiles[3], col_4_queries);
+    //Benchmarking(cfiles[4], col_5_queries);
+    //Benchmarking(cfiles[5], col_6_queries);
+     Benchmarking(cfiles[6], col_7_queries);
 
     return 0;
 }
