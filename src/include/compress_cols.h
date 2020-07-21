@@ -8,6 +8,7 @@ struct Metadata {
     std::vector<bitmap::EliasGammaDeltaEncodedArray<u_int32_t>*> offsets_vector;
     std::vector<std::vector<int>> type;
     std::vector<std::vector<u_int32_t>> index_in_file;
+    u_int32_t* index_array;
 };
 
 class CompressCols {

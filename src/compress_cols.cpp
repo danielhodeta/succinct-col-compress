@@ -726,7 +726,12 @@ int CompressCols::DeltaEAEncode() {
 
     //Sorted DEA Encode
     if(!DeaRleEncodeArray<T>(data_vector.data(), delta_fp+"sorted_data_array/", "sorted_data")) return 0;
-    if(!DeaRleEncodeArray<u_int32_t>(index_vector.data(), delta_fp+"rq_indices_array/", "rq_indices")) return 0;
+
+    FILE *index_write = fopen((delta_fp+"rq_indices").c_str(), "a");
+    size_t write_amount = fwrite(index_vector.data(), sizeof(u_int32_t), index_vector.size(), index_write);
+    assert (write_amount == index_vector.size());
+    fclose(index_write);
+    //if(!DeaRleEncodeArray<u_int32_t>(index_vector.data(), delta_fp+"rq_indices_array/", "rq_indices")) return 0;
 
     std::vector<u_int32_t> index1;
     std::vector<u_int32_t> val1;
@@ -775,9 +780,9 @@ Metadata* CompressCols::ReadMetadata(int file_type, std::string& delta_file_path
         case 1:
             delta_fp = "./out/"+this->split_file_name_+".dea/sorted_data_array/";
             break;
-        case 2:
-            delta_fp = "./out/"+this->split_file_name_+".dea/rq_indices_array/";
-            break;
+        // case 2:
+        //     delta_fp = "./out/"+this->split_file_name_+".dea/rq_indices_array/";
+        //     break;
         default:
             std::cerr<<"deltaeaindexat: invalid type";
             exit(1);
@@ -815,6 +820,13 @@ Metadata* CompressCols::ReadMetadata(int file_type, std::string& delta_file_path
 
         metadata_offset.close();
         metadata.close();
+
+        //Temporary make more static (for file type 0 and 1)
+        FILE* index_read = fopen (("./out/"+this->split_file_name_+".dea/rq_indices").c_str(), "r");
+        meta_data->index_array = new u_int32_t[line_num_];
+        size_t read_amount = fread(meta_data->index_array, sizeof(u_int32_t), line_num_, index_read);
+        assert(read_amount == line_num_);
+        fclose(index_read);
 
         offset_read_flags[file_type] = true;
     }
@@ -991,8 +1003,11 @@ int CompressCols::QueryBinarySearch (T key, u_int32_t& l_index, u_int32_t& u_ind
     Metadata* meta_data = ReadMetadata(1, delta_fp);
     
     //std::cout<<"before "<<(*meta_data->offsets_vector[1])[0]<<"\n";
-    
+    //std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
     int64_t metadata_index = TypeBinarySearch(metadata_size_[1], (*meta_data->offsets_vector[1]), key);
+    // std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+    //     long double time_span = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
+    //     std::cout<<time_span<<"\n";
     int type = meta_data->type[1][metadata_index];
     bitmap::EliasGammaDeltaEncodedArray<T>* dec_array;
     T* run_data;
@@ -1052,9 +1067,7 @@ int CompressCols::QueryBinarySearch (T key, u_int32_t& l_index, u_int32_t& u_ind
         l_index =  l_index + offset - index_in_file;
         u_index = u_index + offset - index_in_file;
 
-        // std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
-        // long double time_span = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
-        // std::cout<<time_span<<"\n";
+        
     }
     
     if (metadata_index < metadata_size_[1] && (l_index - offset) == num_elements-1) {
@@ -1102,9 +1115,12 @@ int CompressCols::SingleKeyLookup (u_int64_t key, std::vector<u_int32_t>* indice
         if(!this->QueryBinarySearch<u_int64_t>(key, l_index, u_index)) return 0;
     }
     
+    std::string delta_fp;
+    Metadata* meta_data = ReadMetadata(1, delta_fp);
+
     for (int i=l_index; i<u_index+1; i++) {
-        (*indices).push_back(this->DeltaEAIndexAt<u_int32_t>(2, i));
-        //(*indices).push_back(i);
+        //(*indices).push_back(this->DeltaEAIndexAt<u_int32_t>(2, i));
+        (*indices).push_back(meta_data->index_array[i]);
     }
 
     return 1;
