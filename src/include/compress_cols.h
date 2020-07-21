@@ -40,8 +40,10 @@ class CompressCols {
     template<typename T> T DeltaEAIndexAt(int file_type, u_int32_t index,
                                             bool get_flag = false,
                                             bitmap::EliasGammaDeltaEncodedArray<T>** get_dec_array = nullptr,
-                                            T* get_run_data = nullptr,
-                                            T* get_unc_data = nullptr);
+                                            T** get_run_data = nullptr,
+                                            T** get_unc_data = nullptr,
+                                            int64_t get_index = -1,
+                                            int type = -1);
     template<typename T> int DeaRleEncodeArray(T* data_array, std::string file_path, std::string file_name);
     template<typename T> int QueryBinarySearch (T key, u_int32_t& l_index, u_int32_t& u_index);
     Metadata* ReadMetadata(int file_type, std::string& delta_file_path);
@@ -53,7 +55,7 @@ class CompressCols {
     CompressCols(std::string file_path, int total_col_num=12, int col_num = 1, bool limit_flag = false);
     int Compress(std::string scheme = "succinct");
     int Decompress();
-    int SingleKeyLookup (u_int64_t key, std::vector<u_int32_t>& indices);
+    int SingleKeyLookup (u_int64_t key, std::vector<u_int32_t>* indices);
     friend void Benchmarking (CompressCols* c_file, std::vector<u_int64_t>& queries);
 
 };

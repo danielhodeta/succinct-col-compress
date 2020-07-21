@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
     Benchmarking(cfiles[3], col_4_queries);
     Benchmarking(cfiles[4], col_5_queries);
     Benchmarking(cfiles[5], col_6_queries);
-    Benchmarking(cfiles[6], col_7_queries);
+     Benchmarking(cfiles[6], col_7_queries);
 
     return 0;
 }
@@ -91,12 +91,13 @@ void Benchmarking (CompressCols* c_file, std::vector<u_int64_t>& queries) {
     std::string file_name = "./bench/bench_";
     int col_num = c_file->col_num_;
     std::ofstream results_stream (file_name+std::to_string(col_num), std::ofstream::trunc);
+    std::ofstream indices_stream (file_name+"dea_indices", std::ofstream::app);
 
     //Warmup
     std::cerr<<"\nWarming up\n";
     for (int i=0; i<std::min(queries.size(), 100UL); i++) {
         std::vector<u_int32_t> indices;
-        c_file->SingleKeyLookup(queries[i], indices);
+        c_file->SingleKeyLookup(queries[i], &indices);
     }
     std::cerr<<"Warming up done\n";
 
@@ -104,11 +105,14 @@ void Benchmarking (CompressCols* c_file, std::vector<u_int64_t>& queries) {
     for (int i=0; i<queries.size(); i++) {
         std::vector<u_int32_t> indices;
         std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-        c_file->SingleKeyLookup(queries[i], indices);
+        c_file->SingleKeyLookup(queries[i], &indices);
         std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
         long double time_span = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
         results_stream<<time_span<<"\n";
+        
+        for (int j=0; j<indices.size(); j++) indices_stream<<indices[j]<<"\n";
     }
     std::cerr<<"Measuring done\n";
     results_stream.close();
+    indices_stream.close();
 }
