@@ -850,6 +850,7 @@ int64_t OffsetPosBinarySearch (u_int32_t metadata_size, bitmap::EliasGammaDeltaE
 //DEA Deserialization
 template<typename T>
 T CompressCols::DeltaEAIndexAt(int file_type, u_int32_t index,
+                                int64_t given_position,
                                 bool get_flag, 
                                 bitmap::EliasGammaDeltaEncodedArray<T>** get_dec_array,
                                 T** get_run_data,
@@ -860,7 +861,12 @@ T CompressCols::DeltaEAIndexAt(int file_type, u_int32_t index,
     std::string delta_fp;
     Metadata* meta_data = ReadMetadata(file_type, delta_fp);
     //std::cout<<metadata_size_[file_type]<<"  <--\n";
-    int64_t position = OffsetPosBinarySearch(this->metadata_size_[file_type], (*meta_data->offsets_vector[file_type]), index);
+    int64_t position;
+    if (given_position == -1) {
+        position = OffsetPosBinarySearch(this->metadata_size_[file_type], (*meta_data->offsets_vector[file_type]), index);
+    } else {
+        position = given_position;
+    }
     assert(position>=0);
     static std::vector<std::vector<bitmap::EliasGammaDeltaEncodedArray<T>*>> dec_arrays {};
     static std::vector<T*> run_data;
@@ -960,17 +966,17 @@ int64_t CompressCols::TypeBinarySearch (u_int32_t metadata_size, bitmap::EliasGa
     u_int64_t lval, rval, lp1, midval;
     while (l_bound<=r_bound) {
         midpoint = l_bound + ((r_bound - l_bound)/2);
-        midval = DeltaEAIndexAt<u_int64_t>(1, offset[midpoint]);
+        midval = DeltaEAIndexAt<u_int64_t>(1, offset[midpoint], midpoint);
         if (value > midval) {
             if (midpoint == metadata_size-1) {return midpoint;}
-            else if (value < DeltaEAIndexAt<u_int64_t>(1, offset[midpoint+1])) {return midpoint;}
+            else if (value < DeltaEAIndexAt<u_int64_t>(1, offset[midpoint+1], midpoint+1)) {return midpoint;}
             else {l_bound = midpoint + 1; continue;}
         } else if (value < midval) {
             if (midpoint == 0) {return -1;}
             else {r_bound = midpoint -1; continue;}
         } else {
             if (midpoint == 0) {return midpoint;}
-            else if (value > DeltaEAIndexAt<u_int64_t>(1, offset[midpoint-1])) {return midpoint;}
+            else if (value > DeltaEAIndexAt<u_int64_t>(1, offset[midpoint-1], midpoint-1)) {return midpoint;}
             else {r_bound = midpoint -1; continue;}
         }
     }
@@ -993,7 +999,7 @@ int CompressCols::QueryBinarySearch (T key, u_int32_t& l_index, u_int32_t& u_ind
     T* unc_data;
     bool flag = 0;
     
-    DeltaEAIndexAt(1, 0, true, &dec_array, &run_data, &unc_data, metadata_index, type);
+    DeltaEAIndexAt(1, 0, 0, true, &dec_array, &run_data, &unc_data, metadata_index, type);
     int num_elements = (*meta_data->offsets_vector[1])[metadata_index+1]-(*meta_data->offsets_vector[1])[metadata_index];
     u_int32_t offset = (*meta_data->offsets_vector[1])[metadata_index];
     //std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
@@ -1056,7 +1062,7 @@ int CompressCols::QueryBinarySearch (T key, u_int32_t& l_index, u_int32_t& u_ind
         T* temp_run_data;
         T* temp_unc_data;
         int next_type = meta_data->type[1][metadata_index+1];
-        DeltaEAIndexAt(1, 0, true, &temp_dec_array, &temp_run_data, &temp_unc_data, metadata_index+1, next_type);
+        DeltaEAIndexAt(1, 0, 0, true, &temp_dec_array, &temp_run_data, &temp_unc_data, metadata_index+1, next_type);
         int next_num_elements = (*meta_data->offsets_vector[1])[metadata_index+2]-(*meta_data->offsets_vector[1])[metadata_index+1];
 
         if (next_type == 0 && temp_dec_array->Get(0)==key) {u_index++;}
@@ -1071,7 +1077,7 @@ int CompressCols::QueryBinarySearch (T key, u_int32_t& l_index, u_int32_t& u_ind
         T* temp_run_data;
         T* temp_unc_data;
         int prev_type = meta_data->type[1][metadata_index-1];
-        DeltaEAIndexAt(1, 0, true, &temp_dec_array, &temp_run_data, &temp_unc_data, metadata_index-1, prev_type);
+        DeltaEAIndexAt(1, 0, 0, true, &temp_dec_array, &temp_run_data, &temp_unc_data, metadata_index-1, prev_type);
         int prev_num_elements = (*meta_data->offsets_vector[1])[metadata_index]-(*meta_data->offsets_vector[1])[metadata_index-1];
 
         if (prev_type == 0 && temp_dec_array->Get(prev_num_elements-1)==key) {l_index--;}
