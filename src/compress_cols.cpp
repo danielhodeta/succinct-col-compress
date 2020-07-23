@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <chrono>
+#include <fstream>
 
 #include "FST.hpp"
 
@@ -731,34 +732,57 @@ int CompressCols::DeltaEAEncode() {
     u_int64_t* value;
 
     std::cout<<new_fst->mem()<<"\n";
-
     if (col_num_ > 3 && col_num_ < 8) {
-        std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+        FILE *bench = fopen (("./bench/queries/test_col_"+std::to_string(col_num_)).c_str(), "r");
+        int query_size = 1000;
+        u_int64_t* queries = new u_int64_t [query_size];
+        size_t read_num = fread(queries, sizeof(u_int64_t), query_size, bench);
+        assert(read_num==query_size);
+        std::ofstream bench_out ("./bench/bench_fst_"+std::to_string(col_num_), std::ofstream::trunc);
+        std::ofstream index_out ("./bench/bench_fst_indices", std::ofstream::app);
 
-        if(!new_fst->lookup(data_vector[line_num_/2], value)) return 0;
+        std::cerr<<"\nWarmup\n";
+        for (int i=0; i<std::min(100, query_size); i++) {
+            if(!new_fst->lookup(queries[i], value)) return 0;
+        }
+        std::cerr<<"Warmup done\n";
 
-        std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+        std::cerr<<"Measuring\n";
+        for (int i=0; i<query_size; i++) {
+            std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+            std::cout<<queries[i]<<"\n";
+            if(!new_fst->lookup(queries[i], value)) return 0;
 
-        long double time_span = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
+            std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 
-        std::cout<<"Time taken for single key lookup for column "<<col_num_<<": "<<time_span<<" nanoseconds.\n";
+            long double time_span = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
+
+            bench_out<<time_span<<"\n";
+            if (col_num_ == 4) {
+                for (int i=1; i<=value[0]; i++) {
+                    index_out<<value[i]<<"\n";
+                }
+            }
+
+        }
+        std::cerr<<"Measuring done\n";
     }
 
     value = nullptr;
     FSTIter iter(new_fst);
 
-    if (col_num_ > 3 && col_num_ < 8) {
+    // if (col_num_ > 3 && col_num_ < 8) {
 
-        std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+    //     std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
-        if(!new_fst->lowerBound(data_vector[line_num_/2], iter)) return 0;
+    //     if(!new_fst->lowerBound(data_vector[line_num_/2], iter)) return 0;
 
-        std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+    //     std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 
-        long double time_span = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
+    //     long double time_span = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
 
-        std::cout<<"Time taken for range query for column "<<col_num_<<": "<<time_span<<" nanoseconds.\n";
-    }
+    //     std::cout<<"Time taken for range query for column "<<col_num_<<": "<<time_span<<" nanoseconds.\n";
+    // }
     
     return 1;
 }
