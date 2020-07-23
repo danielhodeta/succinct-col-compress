@@ -8,6 +8,8 @@ project(succinct-col-compress   VERSION 2.0
 #set executable location
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
 
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g")
+
 #add module
 set (CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 

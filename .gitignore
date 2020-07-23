@@ -37,4 +37,7 @@ fst/src/
 fst/stamp/
 fst/tmp/
 
+#Benchmarks
+bench/*
+
 *.o
