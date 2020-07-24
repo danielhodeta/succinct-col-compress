@@ -15,6 +15,7 @@
 #include <fstream>
 
 #include "FST.hpp"
+#include "morton.h"
 
 //Static Variable Definition
 
@@ -151,6 +152,21 @@ int CompressCols::Decompress() {
 
 }
 
+std::vector<u_int64_t> MergeCols (std::vector<std::vector<u_int64_t>> columns) {
+    
+    //We know only columns 4 - 8 will be merged, their indices are 3-7
+    std::vector<u_int64_t> oneD_vector (columns[3].size() + columns[4].size() + columns[5].size() + columns[6].size());
+
+    for (uint_fast32_t col = 3; col<7; col++) {
+        for (uint_fast32_t i=0; i<columns[col].size(); i++) {
+            uint_fast64_t index = -1;
+            index = libmorton::morton2D_64_encode(i,col-3);
+            oneD_vector[index] = columns[col][i];
+        }
+    }
+    
+    return oneD_vector;
+}
 //File splitting function
 int CompressCols::Split(std::string file_path, int total_col_num) {
 
@@ -165,10 +181,8 @@ int CompressCols::Split(std::string file_path, int total_col_num) {
     }
 
 
-    std::vector<std::vector<u_int64_t>> int64_cols;
-    int64_cols.reserve(total_col_num);
-    std::vector<std::vector<u_int32_t>> int32_cols;
-    int32_cols.reserve(total_col_num);
+    std::vector<std::vector<u_int64_t>> int64_cols (total_col_num);
+    std::vector<std::vector<u_int32_t>> int32_cols (total_col_num);
 
     std::vector<FILE *> file_ptr_vector;
     
@@ -250,7 +264,13 @@ int CompressCols::Split(std::string file_path, int total_col_num) {
         if (i==1||i==2||i==7||i==8||i==10) {
             fwrite(int32_cols[i].data(), sizeof(u_int32_t), int32_cols[i].size(), file_ptr_vector[i]);
         } else {
-            fwrite(int64_cols[i].data(), sizeof(u_int64_t), int64_cols[i].size(), file_ptr_vector[i]);
+            int i = int64_cols.size();
+            std::vector<u_int64_t> merged_vector = MergeCols(int64_cols);
+            FILE* merged = fopen ((split_file_path_prefix+"4567").c_str(), "a");
+            //fwrite(int64_cols[i].data(), sizeof(u_int64_t), int64_cols[i].size(), file_ptr_vector[i]);
+            fwrite(merged_vector.data(), sizeof(u_int64_t), merged_vector.size(), merged);
+            fclose(merged);
+            break;
         }
         fclose(file_ptr_vector[i]);
     }
@@ -677,6 +697,8 @@ int CompressCols::DeaRleEncodeArray(T* data_array, std::string file_path, std::s
     return 1;
 }
 
+
+
 //DEA_Encoding and Serialization
 template<typename T>
 int CompressCols::DeltaEAEncode() {
@@ -696,17 +718,6 @@ int CompressCols::DeltaEAEncode() {
         data_array_with_index[i].data_point = unsorted_data[i];
         data_array_with_index[i].index = i;
     }
-
-    // for (uint64_t i=0; i<line_num_ && (file_in >> read_num); i++) {                           //Converting strings to T and storing in array
-
-    //     // std::istringstream read_stream (read_num);
-    //     // read_stream >> data_array_with_index[i].data_point;
-    //     // unsorted_data[i] = data_array_with_index[i].data_point;
-    //     // data_array_with_index[i].index = i;
-
-
-
-    // }
     
     //file_in.close();
     fclose(file_in);
@@ -723,9 +734,6 @@ int CompressCols::DeltaEAEncode() {
         data_vector.push_back(sorted_data[i].data_point);
         index_vector.push_back(sorted_data[i].index);
     }
-
-    //Dea Encode data_array
-    //if(!DeaRleEncodeArray<T>(data_array, delta_fp+"sorted_data_array/", this->split_file_name_)) return 0;
     
     FST *new_fst = new FST;
     new_fst->load(data_vector, index_vector);
@@ -750,7 +758,7 @@ int CompressCols::DeltaEAEncode() {
         std::cerr<<"Measuring\n";
         for (int i=0; i<query_size; i++) {
             std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-            std::cout<<queries[i]<<"\n";
+            //std::cout<<queries[i]<<"\n";
             if(!new_fst->lookup(queries[i], value)) return 0;
 
             std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
@@ -758,16 +766,26 @@ int CompressCols::DeltaEAEncode() {
             long double time_span = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
 
             bench_out<<time_span<<"\n";
-            if (col_num_ == 4) {
-                for (int i=1; i<=value[0]; i++) {
-                    index_out<<value[i]<<"\n";
-                }
-            }
+            // if (col_num_ == 4) {
+            //     for (int i=1; i<=value[0]; i++) {
+            //         index_out<<value[i]<<"\n";
+            //     }
+            // }
 
         }
         std::cerr<<"Measuring done\n";
     }
-
+    // std::vector<uint_fast64_t> indices;
+    // for (uint_fast32_t i=0; i<5; i++) {
+    //     for (uint_fast32_t j=0; j<5; j++) {
+    //         indices.push_back(libmorton::morton2D_64_encode(i,j));
+    //     }
+    // }
+    // uint_fast32_t x, y;
+    // for (int i=0; i<indices.size(); i++) {
+    //     libmorton::morton2D_64_decode(indices[i], x, y);
+    //     std::cout<<x<<" "<<y<<" < "<<i<<"\n";
+    // }
     value = nullptr;
     FSTIter iter(new_fst);
 
