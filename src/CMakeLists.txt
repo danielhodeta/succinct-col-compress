@@ -5,6 +5,7 @@ include_directories("${SUCCINCT_INCLUDE_DIR}"
                     "${LZ4_INCLUDE_DIR}" 
                     "${DSLIB_INCLUDE_DIR}" 
                     "${FST_INCLUDE_DIR}"
+                    "${LIBMORTON_INCLUDE_DIR}"
                     "./include")
 
 #create executable

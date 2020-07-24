@@ -18,6 +18,7 @@ include(LZ4External)
 include(DSLibExternal)
 include(SuccinctExternal)
 include(FST)
+include(LibMortonExternal)
 #include(FindSuccinct)
 
 #add subdirectories
