@@ -19,6 +19,10 @@ class CompressCols {
     bool compressed_;
     static bool limit_flag_;
 
+    //Min and Max Values
+    static u_int64_t col_5_min_;
+    static u_int64_t col_5_max_; 
+
     int SuccinctCompress();
     int LZ4Compress();
     void LZ4Decompress();

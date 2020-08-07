@@ -25,6 +25,9 @@ int CompressCols::total_col_num_ = 0;
 bool CompressCols::limit_flag_ = 0;
 std::string CompressCols::ifile_path_ = "";
 
+u_int64_t CompressCols::col_5_min_;
+u_int64_t CompressCols::col_5_max_;
+
 //Time Stamp
 typedef unsigned long long int timestamp_t;
 
@@ -152,26 +155,14 @@ int CompressCols::Decompress() {
 
 }
 
-std::vector<u_int64_t> MergeCols (std::vector<std::vector<u_int64_t>> columns) {
-    
-    //We know only columns 4 - 8 will be merged, their indices are 3-7
-    std::vector<u_int64_t> oneD_vector (columns[3].size() + columns[4].size() + columns[5].size() + columns[6].size());
 
-    for (uint_fast32_t col = 3; col<7; col++) {
-        for (uint_fast32_t i=0; i<columns[col].size(); i++) {
-            uint_fast64_t index = -1;
-            index = libmorton::morton2D_64_encode(i,col-3);
-            oneD_vector[index] = columns[col][i];
-        }
-    }
-    
-    return oneD_vector;
-}
 //File splitting function
 int CompressCols::Split(std::string file_path, int total_col_num) {
 
-    timestamp_t start = get_timestamp();
+    timestamp_t start = get_timestamp();                    //Start timer
 
+
+    //Determine file path
     size_t index {file_path.find_last_of("/", file_path.length())};
     std::string split_file_path_prefix;
     if (index == -1) {
@@ -186,6 +177,7 @@ int CompressCols::Split(std::string file_path, int total_col_num) {
 
     std::vector<FILE *> file_ptr_vector;
     
+    //Open file pointers
     for (int i=0; i<total_col_num && i!=11; i++) {
         std::string file_path = split_file_path_prefix+std::to_string(i+1);
         FILE *fptr = fopen(file_path.c_str(), "a");
@@ -195,8 +187,7 @@ int CompressCols::Split(std::string file_path, int total_col_num) {
     std::ofstream col12_stream; 
     col12_stream.open(split_file_path_prefix+"12.txt", std::ofstream::trunc);
 
-
-
+    //Check file is valid
     FILE *fptr = fopen(file_path.c_str(), "r");
     
     if (!fptr) {
@@ -204,9 +195,7 @@ int CompressCols::Split(std::string file_path, int total_col_num) {
         exit(1);
     }
     
-    // std::ofstream file_out;
-    // file_out.open(sfp, std::ofstream::trunc);
-
+    //Start splitting
 
     int line_count = 0;
     char *buffer = nullptr;
@@ -243,6 +232,11 @@ int CompressCols::Split(std::string file_path, int total_col_num) {
                     u_int64_t cast_num;
                     s_stream >> cast_num;
                     int64_cols[i].push_back(cast_num);
+                    if(i==4) {
+                        if (line_count == 0) {col_5_min_ = cast_num; col_5_max_ = cast_num;}
+                        col_5_min_ = (cast_num < col_5_min_) ? cast_num : col_5_min_;
+                        col_5_max_ = (cast_num > col_5_max_) ? cast_num : col_5_max_;
+                    }
                 }
 
             }
@@ -264,13 +258,7 @@ int CompressCols::Split(std::string file_path, int total_col_num) {
         if (i==1||i==2||i==7||i==8||i==10) {
             fwrite(int32_cols[i].data(), sizeof(u_int32_t), int32_cols[i].size(), file_ptr_vector[i]);
         } else {
-            int i = int64_cols.size();
-            std::vector<u_int64_t> merged_vector = MergeCols(int64_cols);
-            FILE* merged = fopen ((split_file_path_prefix+"4567").c_str(), "a");
-            //fwrite(int64_cols[i].data(), sizeof(u_int64_t), int64_cols[i].size(), file_ptr_vector[i]);
-            fwrite(merged_vector.data(), sizeof(u_int64_t), merged_vector.size(), merged);
-            fclose(merged);
-            break;
+            fwrite(int64_cols[i].data(), sizeof(u_int64_t), int64_cols[i].size(), file_ptr_vector[i]); 
         }
         fclose(file_ptr_vector[i]);
     }
@@ -697,7 +685,124 @@ int CompressCols::DeaRleEncodeArray(T* data_array, std::string file_path, std::s
     return 1;
 }
 
+template<typename T>
+int MortonQuery(FST* new_fst, uint_fast32_t x_min, uint_fast32_t x_max, uint_fast32_t y_min, uint_fast32_t y_max,
+                T* x_data, T* y_data, std::vector<u_int64_t>& values) {
 
+    FSTIter iter(new_fst);
+    u_int64_t* value = nullptr;
+    uint_fast64_t morton_l = libmorton::morton2D_64_encode(x_min, y_min);
+    uint_fast64_t morton_u = libmorton::morton2D_64_encode(x_max, y_max);
+    
+    if(!new_fst->lowerBound(morton_l, iter)) return 0;
+
+    uint_fast64_t curr_morton = morton_l;
+    uint_fast64_t last_hit = morton_l;
+    
+
+    // FSTIter new_iter(new_fst);
+    // if(!new_fst->lowerBound(3475920403380047075, new_iter)) return 0;\
+    // u_int64_t keyy = libmorton::morton2D_64_encode(1188343843, 1188343842);
+    // libmorton::morton2D_64_decode(keyy, morton_l, morton_u);
+    // while (new_fst->lookup(keyy++, value) == 0);
+    // value = new_iter.value();
+
+    for (; ; iter++) {
+        value = iter.value();
+        bool check = true;
+        //Check it's within our bondary
+        while (x_data[value[1]] < x_min 
+            || x_data[value[1]] > x_max
+            || y_data[value[1]] < y_min
+            || y_data[value[1]] > y_max) {
+
+
+                //Update morton value
+                curr_morton = libmorton::morton2D_64_encode(x_data[value[1]], y_data[value[1]]);
+
+                //Check it's lower than max morton
+                if (curr_morton>morton_u || curr_morton<morton_l) return 1;
+
+
+                //Get the next morton value within boundary
+                uint_fast32_t last_x, last_y, next_x, next_y;
+                libmorton::morton2D_64_decode(last_hit, last_x, last_y);
+                bool x_dir = false;
+                bool y_dir = false;
+                next_x = last_x;
+                next_y = last_y;
+                if (last_x<x_max) {x_dir = true;} 
+                if (last_y<y_max) {y_dir = true;}
+                
+
+                //Get as close as possible
+                uint_fast64_t next_morton;
+                
+                do {
+                    next_morton = libmorton::morton2D_64_encode(next_x, next_y);
+                } while ( next_morton < curr_morton && next_y++ && next_y<y_max);
+
+                next_y--;
+
+                do {
+                    next_morton = libmorton::morton2D_64_encode(next_x, next_y);
+                } while ( next_morton < curr_morton && next_x++ && next_x< x_max);
+
+                next_x--;
+
+                //Find next morton
+                x_dir = false;
+                y_dir = false;
+                
+                last_x = next_x;
+                last_y = next_y;
+
+                if (next_x<x_max) {next_x++; x_dir = true;} 
+                if (next_y<y_max) {next_y++; y_dir = true;}
+
+                uint_fast64_t next_morton_x, next_morton_y;
+                if (x_dir) next_morton_x = libmorton::morton2D_64_encode(next_x, last_y);
+                if (y_dir) next_morton_y = libmorton::morton2D_64_encode(last_x, next_y);
+
+                if (x_dir && !y_dir) {
+                    last_hit = next_morton_x;
+                    if(!new_fst->lowerBound(next_morton_x, iter)) return 0;
+                } else if (y_dir && !x_dir) {
+                    last_hit = next_morton_y;
+                    if(!new_fst->lowerBound(next_morton_y, iter)) return 0;
+                    
+                } else if (y_dir && x_dir) {
+                    if (next_morton_x < next_morton_y) {
+                        last_hit = next_morton_x;
+                        if(!new_fst->lowerBound(next_morton_x, iter)) return 0;
+                    }
+                    else {
+                        last_hit = next_morton_y;
+                        if(!new_fst->lowerBound(next_morton_y, iter)) return 0;
+                    }
+                } else {
+                    return 0;
+                }
+                value = iter.value();
+
+                //Update morton value
+                curr_morton = libmorton::morton2D_64_encode(x_data[value[1]], y_data[value[1]]);
+                if (curr_morton <= last_hit) {
+                    iter++;
+                    check = false;
+                    break;
+                }
+                
+        }
+        if (check) {
+            last_hit = libmorton::morton2D_64_encode(x_data[value[1]], y_data[value[1]]);
+            for (int i=1; i<=value[0]; i++)
+                values.push_back(value[i]);
+        }
+    }
+
+    return 1;
+}
 
 //DEA_Encoding and Serialization
 template<typename T>
@@ -705,26 +810,36 @@ int CompressCols::DeltaEAEncode() {
 
     std::string delta_fp = "./out/"+this->split_file_name_+".dea/";
     if(mkdir(delta_fp.c_str(), 0777) == -1) return 0;
+    std::string col_5_delta_fp = "./out/test_col_5.dea/";
+    if(mkdir(col_5_delta_fp.c_str(), 0777) == -1) return 0;
 
     //std::ifstream file_in (this->split_file_path_);                                                //Reading split file
     FILE *file_in = fopen(this->split_file_path_.c_str(), "r");
+    FILE *col_5_file_in = fopen("./out/test_col_5", "r");
     //std::string read_num;
 
     T* unsorted_data = new T[line_num_];
+    T* col_5_unsorted_data = new T[line_num_];
+
     DataWithIndexStruct<T> *data_array_with_index = new DataWithIndexStruct<T>[line_num_];
 
     fread(unsorted_data, sizeof(T), line_num_, file_in);
+    fread(col_5_unsorted_data, sizeof(T), line_num_, col_5_file_in);
+
     for (int i=0; i<line_num_; i++) {
-        data_array_with_index[i].data_point = unsorted_data[i];
+        data_array_with_index[i].data_point = libmorton::morton2D_64_encode((uint_fast32_t)unsorted_data[i], (uint_fast32_t)col_5_unsorted_data[i]);
         data_array_with_index[i].index = i;
     }
     
-    //file_in.close();
     fclose(file_in);
+    fclose(col_5_file_in);
 
     //Random access encode
     if(!DeaRleEncodeArray<T>(unsorted_data, delta_fp+"unsorted_data_arr/", this->split_file_name_)) return 0;
-    delete[] unsorted_data;
+    if(!DeaRleEncodeArray<T>(col_5_unsorted_data, col_5_delta_fp+"unsorted_data_arr/", "test_col_5")) return 0;
+    //delete[] unsorted_data;
+    //delete[] col_5_unsorted_data;
+
     //Sort
     DataWithIndexStruct<T>* sorted_data = MergeSort<T>(data_array_with_index, line_num_);
     delete[] data_array_with_index;
@@ -737,9 +852,11 @@ int CompressCols::DeltaEAEncode() {
     
     FST *new_fst = new FST;
     new_fst->load(data_vector, index_vector);
-    u_int64_t* value;
+    u_int64_t* value = nullptr;
 
     std::cout<<new_fst->mem()<<"\n";
+    FSTIter iter(new_fst);
+
     if (col_num_ > 3 && col_num_ < 8) {
         FILE *bench = fopen (("./bench/queries/test_col_"+std::to_string(col_num_)).c_str(), "r");
         int query_size = 1000;
@@ -749,9 +866,16 @@ int CompressCols::DeltaEAEncode() {
         std::ofstream bench_out ("./bench/bench_fst_"+std::to_string(col_num_), std::ofstream::trunc);
         std::ofstream index_out ("./bench/bench_fst_indices", std::ofstream::app);
 
+        std::vector<u_int64_t> values;
+
         std::cerr<<"\nWarmup\n";
+         int result;
         for (int i=0; i<std::min(100, query_size); i++) {
-            if(!new_fst->lookup(queries[i], value)) return 0;
+            std::cout<<"i: "<<i<<"\n";
+            result = MortonQuery<T>(new_fst, queries[i], queries[i], col_5_min_, col_5_max_,
+                                        unsorted_data, col_5_unsorted_data, values);
+            std::cout<<"value size: "<<values.size()<<"\n";
+            values.clear();
         }
         std::cerr<<"Warmup done\n";
 
@@ -759,7 +883,8 @@ int CompressCols::DeltaEAEncode() {
         for (int i=0; i<query_size; i++) {
             std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
             //std::cout<<queries[i]<<"\n";
-            if(!new_fst->lookup(queries[i], value)) return 0;
+            result = MortonQuery<T>(new_fst, queries[i], queries[i], col_5_min_, col_5_max_,
+                                        unsorted_data, col_5_unsorted_data, values);
 
             std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 
@@ -775,19 +900,7 @@ int CompressCols::DeltaEAEncode() {
         }
         std::cerr<<"Measuring done\n";
     }
-    // std::vector<uint_fast64_t> indices;
-    // for (uint_fast32_t i=0; i<5; i++) {
-    //     for (uint_fast32_t j=0; j<5; j++) {
-    //         indices.push_back(libmorton::morton2D_64_encode(i,j));
-    //     }
-    // }
-    // uint_fast32_t x, y;
-    // for (int i=0; i<indices.size(); i++) {
-    //     libmorton::morton2D_64_decode(indices[i], x, y);
-    //     std::cout<<x<<" "<<y<<" < "<<i<<"\n";
-    // }
-    value = nullptr;
-    FSTIter iter(new_fst);
+    
 
     // if (col_num_ > 3 && col_num_ < 8) {
 
