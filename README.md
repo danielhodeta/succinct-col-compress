@@ -1,6 +1,6 @@
 # succinct-col-compress
  
-This program splits a given file into columns and compresses each column. It assumes that the file is metadata of 12 columns.
+This program splits a given file into columns and compresses each column.
 
 **Usage**
 
